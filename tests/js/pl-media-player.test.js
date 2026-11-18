@@ -1,6 +1,38 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+const jqueryEventHandlers = new WeakMap();
+
+globalThis.jQuery = (target) => ({
+  on(events, handler) {
+    if (typeof events === 'object') {
+      for (const [name, callback] of Object.entries(events)) this.on(name, callback);
+      return this;
+    }
+    if (typeof target.addEventListener === 'function') {
+      target.addEventListener(events, handler);
+      return this;
+    }
+    let handlers = jqueryEventHandlers.get(target);
+    if (!handlers) {
+      handlers = new Map();
+      jqueryEventHandlers.set(target, handlers);
+    }
+    const callbacks = handlers.get(events) ?? [];
+    callbacks.push(handler);
+    handlers.set(events, callbacks);
+    return this;
+  },
+
+  trigger(name, parameters = []) {
+    const handlers = jqueryEventHandlers.get(target);
+    for (const handler of handlers?.get(name) ?? []) {
+      handler({ target, type: name }, ...parameters);
+    }
+    return this;
+  },
+});
+
 await import('../../elements/pl-media-player/pl-media-player.js');
 
 const { MediaPlayerController } = globalThis.PLMediaPlayer;
@@ -27,7 +59,9 @@ class FakeMedia extends EventTarget {
     super();
     this.currentTime = 0;
     this.ended = false;
+    this.muted = false;
     this.seeking = false;
+    this.volume = 1;
     this.pauseCalls = 0;
     this.playCalls = 0;
     this.attributes = new Map();
@@ -84,6 +118,7 @@ class MemoryStorage {
 function controller(overrides = {}, storage = null) {
   const container = new FakeContainer();
   const config = {
+    allowMuting: true,
     allowPause: true,
     allowSeeking: true,
     maxPlays: 2,
@@ -172,6 +207,97 @@ test('multiple players use independent storage keys', () => {
   assert.equal(storage.values.size, 1);
 });
 
+test('volume is cached across variants without playback persistence', () => {
+  const storage = new MemoryStorage();
+  const first = controller({ persist: false, variantId: 'first' }, storage);
+
+  first.container.media.volume = 0.35;
+  first.container.media.emit('volumechange');
+
+  const next = controller({ persist: false, playerId: 'other', variantId: 'second' }, storage);
+  assert.equal(next.container.media.volume, 0.35);
+  assert.deepEqual(JSON.parse(storage.getItem('pl-media-player:volume:v1')), {
+    volume: 0.35,
+    lastAudibleVolume: 0.35,
+  });
+});
+
+test('volume changes synchronize players already initialized on the page', () => {
+  const storage = new MemoryStorage();
+  const first = controller({ playerId: 'first' }, storage);
+  const second = controller({ playerId: 'second' }, storage);
+
+  first.container.media.volume = 0.6;
+  first.container.media.emit('volumechange');
+
+  assert.equal(second.container.media.volume, 0.6);
+});
+
+test('restricted players reject mute and zero while preserving the cached preference', () => {
+  const storage = new MemoryStorage();
+  const unrestricted = controller({ allowMuting: true, playerId: 'unrestricted' }, storage);
+  const restricted = controller({ allowMuting: false, playerId: 'restricted' }, storage);
+
+  unrestricted.container.media.volume = 0.4;
+  unrestricted.container.media.emit('volumechange');
+  unrestricted.container.media.volume = 0;
+  unrestricted.container.media.emit('volumechange');
+
+  assert.equal(restricted.container.media.volume, 0.4);
+  assert.deepEqual(JSON.parse(storage.getItem('pl-media-player:volume:v1')), {
+    volume: 0,
+    lastAudibleVolume: 0.4,
+  });
+
+  restricted.container.media.muted = true;
+  restricted.container.media.emit('volumechange');
+  assert.equal(restricted.container.media.muted, false);
+  assert.equal(restricted.container.media.volume, 0.4);
+
+  restricted.container.media.volume = 0;
+  restricted.container.media.emit('volumechange');
+  assert.equal(restricted.container.media.volume, 0.4);
+
+  const futureUnrestricted = controller(
+    { allowMuting: true, playerId: 'future-unrestricted' },
+    storage,
+  );
+  const futureRestricted = controller(
+    { allowMuting: false, playerId: 'future-restricted' },
+    storage,
+  );
+  assert.equal(futureUnrestricted.container.media.volume, 0);
+  assert.equal(futureRestricted.container.media.volume, 0.4);
+});
+
+test('mute state is neither cached nor synchronized when muting is allowed', () => {
+  const storage = new MemoryStorage();
+  const first = controller({ playerId: 'first' }, storage);
+  const second = controller({ playerId: 'second' }, storage);
+
+  first.container.media.muted = true;
+  first.container.media.emit('volumechange');
+
+  assert.equal(first.container.media.muted, true);
+  assert.equal(second.container.media.muted, false);
+  assert.equal(storage.getItem('pl-media-player:volume:v1'), null);
+});
+
+test('invalid cached volume is ignored and a missing audible value is repaired', () => {
+  const invalidStorage = new MemoryStorage();
+  invalidStorage.setItem(
+    'pl-media-player:volume:v1',
+    JSON.stringify({ volume: 2, lastAudibleVolume: 0.5 }),
+  );
+  const invalid = controller({}, invalidStorage);
+  assert.equal(invalid.container.media.volume, 1);
+
+  const zeroStorage = new MemoryStorage();
+  zeroStorage.setItem('pl-media-player:volume:v1', JSON.stringify({ volume: 0 }));
+  const restricted = controller({ allowMuting: false }, zeroStorage);
+  assert.equal(restricted.container.media.volume, 1);
+});
+
 test('a loading failure before playing consumes no attempt', () => {
   const { container, instance } = controller();
   container.media.emit('error');
@@ -192,5 +318,7 @@ test('blocked localStorage does not crash playback', () => {
   const { container, instance } = controller({ persist: true }, storage);
 
   assert.doesNotThrow(() => container.media.emit('playing'));
+  container.media.volume = 0.5;
+  assert.doesNotThrow(() => container.media.emit('volumechange'));
   assert.equal(instance.budget.playsUsed, 1);
 });
