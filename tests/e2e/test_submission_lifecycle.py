@@ -8,7 +8,6 @@ import lxml.html
 import pytest
 from prairielearn_e2e import PrairieLearnBackend
 
-
 COURSE_ROOT = Path(__file__).resolve().parents[2]
 QUESTION_ROOT = COURSE_ROOT / "questions" / "media" / "audio-limited"
 ELEMENT_HTML = """
