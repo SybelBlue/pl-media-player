@@ -12,19 +12,11 @@
 }
 
 .pl-media-player video {
-  display: block;
-  height: auto;
-  margin-inline: auto;
   max-height: 32rem;
-  max-width: 100%;
 }
 
 .pl-media-player-youtube {
   aspect-ratio: 16 / 9;
-  display: block;
-  height: auto;
-  margin-inline: auto;
-  max-width: 100%;
 }
 
 .pl-media-player-controls {
