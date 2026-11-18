@@ -89,6 +89,8 @@ class FakeContainer extends FakeElement {
     this.muteButton.setAttribute('class', 'pl-media-player-mute btn btn-outline-secondary btn-sm');
     this.muteTooltip = new FakeElement();
     this.volume = new FakeElement();
+    this.playbackCount = new FakeElement();
+    this.playbackCount.value = '0';
     this.remaining = new FakeElement();
     this.status = new FakeElement();
     this.setAttribute('data-pl-media-player-config', JSON.stringify(config));
@@ -108,6 +110,7 @@ class FakeContainer extends FakeElement {
     if (selector === '.pl-media-player-mute') return [this.muteButton];
     if (selector === '.pl-media-player-mute-tooltip') return [this.muteTooltip];
     if (selector === '.pl-media-player-volume') return [this.volume];
+    if (selector === '.pl-media-player-playback-count') return [this.playbackCount];
     if (selector === '.pl-media-player-remaining') return [this.remaining];
     if (selector === '.pl-media-player-status') return [this.status];
     return [];
@@ -270,8 +273,10 @@ function config(overrides = {}) {
   };
 }
 
-function container(overrides = {}) {
-  return new FakeContainer(config(overrides));
+function container(overrides = {}, playsUsed = 0) {
+  const player = new FakeContainer(config(overrides));
+  player.playbackCount.value = String(playsUsed);
+  return player;
 }
 
 function loadPlayers(containers, storage = new MemoryStorage()) {
@@ -480,6 +485,22 @@ test('persisted counts survive reload while a new variant is independent', () =>
   const nextVariant = container({ persist: true, variantId: 'second' });
   loadPlayers([nextVariant], storage);
   assert.equal(nextVariant.remaining.textContent, '2 playback attempts remaining.');
+});
+
+test('submitted playback count survives Save and Grade without browser persistence', () => {
+  const first = container();
+  loadPlayers([first]);
+  first.media.emit('playing');
+
+  assert.equal(first.playbackCount.value, '1');
+
+  const rerendered = container({}, first.playbackCount.value);
+  loadPlayers([rerendered]);
+
+  assert.equal(rerendered.remaining.textContent, '1 playback attempt remaining.');
+  rerendered.media.emit('playing');
+  assert.equal(rerendered.playbackCount.value, '2');
+  assert.equal(rerendered.remaining.textContent, '0 playback attempts remaining.');
 });
 
 test('multiple players use independent storage keys', () => {

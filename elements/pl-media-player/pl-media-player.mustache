@@ -18,6 +18,13 @@
     ></iframe>
   {{/youtube}}
   {{^youtube}}
+    <input
+      class="pl-media-player-playback-count"
+      type="hidden"
+      name="{{playback_count_name}}"
+      value="{{plays_used}}"
+      data-skip-unload-check="true"
+    />
     {{#audio}}
       <audio controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
         <source src="{{src}}" {{#mime_type}} type="{{mime_type}}"{{/mime_type}} /> Your browser

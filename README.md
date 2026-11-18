@@ -164,6 +164,9 @@ browser reports that media is actually playing, so a load failure before playbac
 the budget. An allowed pause and resume stays in the same session. Replaying after `ended` begins a
 new session. Once the budget is exhausted, a new session is paused and a visible message is shown.
 
+The consumed count is included in each Save or Save and Grade submission, so rendering the saved
+submission does not reset the playback budget.
+
 With `persist="variant"`, the consumed count is saved under a key containing PrairieLearn's
 `variant_id` and the stable player identity. Reloading during a session does not refund the attempt.
 If local storage is unavailable, playback continues with in-memory limits and no uncaught error.

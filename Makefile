@@ -6,7 +6,7 @@ SHELL := /bin/sh
 UV_CACHE_DIR ?= /tmp/learnvia-uv-cache
 UV_RUN ?= uv run --active --locked
 
-LIB_TEST_PATHS := scripts/tests elements
+LIB_TEST_PATHS := scripts/tests elements tests/e2e
 
 QUESTION_PATHS ?= questions
 E2E_SEED_COUNT ?= 3

@@ -60,6 +60,7 @@ MIME_TYPES = {
 }
 
 PARAMS_KEY = "_pl_media_player"
+PLAYBACK_COUNT_NAME_PREFIX = "_pl_media_player_plays_"
 PLAYER_ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 YOUTUBE_VIDEO_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 OPTIONAL_ATTRIBUTES = [
@@ -81,9 +82,10 @@ OPTIONAL_ATTRIBUTES = [
 
 # PrairieLearn loads a fresh controller module for each lifecycle phase and invokes
 # element instances in document order. Separate counters therefore produce the same
-# stable automatic identity during prepare and render.
+# stable automatic identity during prepare, render, and parse.
 _prepare_indices = itertools.count()
 _render_indices = itertools.count()
+_parse_indices = itertools.count()
 
 
 def _element(element_html: str | bytes) -> lxml.html.HtmlElement:
@@ -127,6 +129,20 @@ def _persist(element: lxml.html.HtmlElement) -> Persist:
 
 def _player_id(element: lxml.html.HtmlElement, instance_index: int) -> str:
     return pl.get_string_attrib(element, "player-id", f"auto-{instance_index + 1}")
+
+
+def _playback_count_name(player_id: str) -> str:
+    return f"{PLAYBACK_COUNT_NAME_PREFIX}{player_id}"
+
+
+def _submitted_playback_count(data: pl.QuestionData, player_id: str) -> int:
+    raw_submitted_answers = data.get("raw_submitted_answers", {})
+    if not isinstance(raw_submitted_answers, dict):
+        return 0
+    value = raw_submitted_answers.get(_playback_count_name(player_id))
+    if not isinstance(value, str) or re.fullmatch(r"\d+", value) is None:
+        return 0
+    return int(value)
 
 
 def _relative_path(
@@ -526,6 +542,20 @@ def prepare(element_html: str, data: pl.QuestionData) -> None:
     _prepare_with_index(element_html, data, next(_prepare_indices))
 
 
+def _parse_with_index(
+    element_html: str | bytes, data: pl.QuestionData, instance_index: int
+) -> None:
+    element = _element(element_html)
+    config = Config.from_element(element, instance_index)
+    # Preserve the count in raw submission metadata without exposing it as a
+    # gradable answer.
+    data["submitted_answers"].pop(_playback_count_name(config.player_id), None)
+
+
+def parse(element_html: str, data: pl.QuestionData) -> None:
+    _parse_with_index(element_html, data, next(_parse_indices))
+
+
 def _url_path(file_name: str) -> str:
     return "/".join(quote(part, safe="") for part in PurePosixPath(file_name).parts)
 
@@ -569,6 +599,8 @@ def _render_with_index(
         "config_json": json.dumps(client_config, separators=(",", ":")),
         "dom_id": dom_id,
         "mime_type": MIME_TYPES.get(extension),
+        "playback_count_name": _playback_count_name(config.player_id),
+        "plays_used": _submitted_playback_count(data, config.player_id),
         "show_remaining": config.show_remaining,
         "src": src,
         "video": media_type is MediaType.VIDEO,
