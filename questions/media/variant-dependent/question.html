@@ -4,8 +4,10 @@
     The question's <code>generate()</code> chooses the clip because the selection determines the
     correct answer. The element receives the selected filename explicitly.
   </p>
-  <pre><code>&lt;pl-media-player file-name="{{params.selected_clip}}" max-plays="2"&gt;
-&lt;/pl-media-player&gt;</code></pre>
+  <pl-code language="html">
+&lt;pl-media-player file-name="{{params.selected_clip}}" max-plays="2"&gt;
+&lt;/pl-media-player&gt;
+  </pl-code>
   <pl-media-player file-name="{{params.selected_clip}}" max-plays="2" player-id="code-word">
   </pl-media-player>
   <p>Type the one-word direction spoken in the recording.</p>

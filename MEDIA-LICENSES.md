@@ -4,8 +4,8 @@ The WAV recordings under `questions/media/**/clientFilesQuestion` were synthesiz
 repository from original demonstration text. The repository contributors dedicate those recordings
 to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
-`questions/media/video-limited/clientFilesQuestion/big-buck-bunny.m4v` is a six-second excerpt from
-_Big Buck Bunny_:
+The `big-buck-bunny.m4v` files in the `video-basic` and `video-limited` question directories are
+copies of the same six-second excerpt from _Big Buck Bunny_:
 
 - Copyright © 2008 Blender Foundation, [bigbuckbunny.org](https://peach.blender.org/)
 - Licensed under [Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/)

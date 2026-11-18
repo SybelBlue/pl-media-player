@@ -187,9 +187,10 @@ def generate(data):
 <pl-string-input answers-name="direction"></pl-string-input>
 ```
 
-The demonstration course includes both patterns, multiple players, a persisted player, a limited
-video, and a representative language-listening question. Every public demo keeps media in its own
-`clientFilesQuestion` directory so it remains copyable through PrairieLearn content sharing.
+The demonstration course includes both patterns, multiple players, a persisted player, basic and
+limited videos, and a representative language-listening question. Every public demo keeps media in
+its own `clientFilesQuestion` directory so it remains copyable through PrairieLearn content
+sharing.
 
 ## Development
 

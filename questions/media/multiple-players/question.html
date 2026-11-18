@@ -1,10 +1,12 @@
 <pl-question-panel>
   <h2>Two independent players</h2>
   <p>Each player has its own DOM controller, counter, and stable persistence identity.</p>
-  <pre><code>&lt;pl-media-player file-name="first.wav" max-plays="1" player-id="first"&gt;
+  <pl-code language="html">
+&lt;pl-media-player file-name="first.wav" max-plays="1" player-id="first"&gt;
 &lt;/pl-media-player&gt;
 &lt;pl-media-player file-name="second.wav" max-plays="2" player-id="second"&gt;
-&lt;/pl-media-player&gt;</code></pre>
+&lt;/pl-media-player&gt;
+  </pl-code>
   <h3>First player: one attempt</h3>
   <pl-media-player file-name="first.wav" max-plays="1" player-id="first">
   </pl-media-player>

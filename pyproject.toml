@@ -21,6 +21,7 @@ dev = [
   "rich",
   "pyfakefs",
   "prairielearn",
+  "pygments-ansi-color==0.3.0",
   "sketchresponse",
 ]
 
