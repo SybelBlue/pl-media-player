@@ -61,6 +61,7 @@ MIME_TYPES = {
 PARAMS_KEY = "_pl_media_player"
 PLAYER_ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 OPTIONAL_ATTRIBUTES = [
+    "allow-muting",
     "allow-pause",
     "allow-seeking",
     "directory",
@@ -219,6 +220,19 @@ def _max_plays(element: lxml.html.HtmlElement) -> int | None:
     return value
 
 
+def _allow_muting(element: lxml.html.HtmlElement, max_plays: int | None) -> bool:
+    value = pl.get_string_attrib(element, "allow-muting", "auto")
+    if value == "auto":
+        return max_plays is None
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise ValueError(
+        f'Invalid allow-muting value "{value}"; expected one of: auto, true, false.'
+    )
+
+
 def _select_file(
     element: lxml.html.HtmlElement,
     data: pl.QuestionData,
@@ -312,7 +326,8 @@ def _prepare_with_index(
     directory = _directory(element)
     requested_media_type = _media_type(element)
     _persist(element)
-    _max_plays(element)
+    max_plays = _max_plays(element)
+    _allow_muting(element, max_plays)
     pl.get_boolean_attrib(element, "allow-pause", True)
     pl.get_boolean_attrib(element, "allow-seeking", True)
     pl.get_boolean_attrib(element, "show-remaining", True)
@@ -369,6 +384,7 @@ def _render_with_index(
     show_remaining = pl.get_boolean_attrib(element, "show-remaining", True)
     dom_id = pl.get_uuid()
     config = {
+        "allowMuting": _allow_muting(element, max_plays),
         "allowPause": pl.get_boolean_attrib(element, "allow-pause", True),
         "allowSeeking": pl.get_boolean_attrib(element, "allow-seeking", True),
         "maxPlays": max_plays,

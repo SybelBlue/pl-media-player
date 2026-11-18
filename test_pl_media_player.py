@@ -190,6 +190,10 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
             '<pl-media-player file-name="clip.wav" player-id="not valid"></pl-media-player>',
             "player-id",
         ),
+        (
+            '<pl-media-player file-name="clip.wav" allow-muting="sometimes"></pl-media-player>',
+            "allow-muting",
+        ),
     ],
 )
 def test_invalid_configurations_are_rejected(data, html, message):
@@ -224,6 +228,7 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
 
     assert "folder%20name/clip.wav" in output
     assert config == {
+        "allowMuting": False,
         "allowPause": False,
         "allowSeeking": False,
         "maxPlays": 2,
@@ -232,3 +237,24 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
         "showRemaining": True,
         "variantId": "99",
     }
+
+
+@pytest.mark.parametrize(
+    ("attributes", "expected"),
+    [
+        ("", True),
+        ('max-plays="2"', False),
+        ('max-plays="2" allow-muting="true"', True),
+        ('allow-muting="false"', False),
+    ],
+)
+def test_allow_muting_resolves_auto_and_explicit_values(data, attributes, expected):
+    write_media(data, "clip.wav")
+    html = f'<pl-media-player file-name="clip.wav" {attributes}></pl-media-player>'
+
+    prepare(html, data)
+    output = render(html, data)
+    document = media_player.lxml.html.fragment_fromstring(output)
+    config = json.loads(document.attrib["data-pl-media-player-config"])
+
+    assert config["allowMuting"] is expected
