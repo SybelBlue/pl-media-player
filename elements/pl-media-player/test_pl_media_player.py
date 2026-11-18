@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,7 @@ SPEC = importlib.util.spec_from_file_location(
 )
 assert SPEC is not None and SPEC.loader is not None
 media_player = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = media_player
 SPEC.loader.exec_module(media_player)
 
 
@@ -49,6 +52,28 @@ def prepare(html: str, data, index: int = 0) -> None:
 
 def render(html: str, data, index: int = 0) -> str:
     return media_player._render_with_index(html, data, index)
+
+
+def test_config_is_frozen_portable_and_validated():
+    element = media_player._element(
+        '<pl-media-player file-name="clip.wav" max-plays="2" '
+        'persist="variant"></pl-media-player>'
+    )
+
+    config = media_player.Config.from_element(element, 0)
+
+    assert config.to_client_dict("variant-1") == {
+        "allowMuting": False,
+        "allowPause": True,
+        "allowSeeking": True,
+        "maxPlays": 2,
+        "persist": True,
+        "playerId": "auto-1",
+        "showRemaining": True,
+        "variantId": "variant-1",
+    }
+    with pytest.raises(FrozenInstanceError):
+        setattr(config, "max_plays", 3)
 
 
 def test_explicit_question_file_is_resolved_and_rendered(data):
@@ -193,6 +218,11 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
         (
             '<pl-media-player file-name="clip.wav" allow-muting="sometimes"></pl-media-player>',
             "allow-muting",
+        ),
+        (
+            '<pl-media-player source-directory="clips" randomize="true" '
+            'media-type="audio" extensions="mp4"></pl-media-player>',
+            "Unsupported extensions",
         ),
     ],
 )

@@ -1,7 +1,6 @@
-(() => {
+(($) => {
   'use strict';
 
-  const $ = globalThis.jQuery;
   const VOLUME_STORAGE_KEY = 'pl-media-player:volume:v1';
   const volumePreferenceManagers = new WeakMap();
   let transientVolumePreferenceManager = null;
@@ -75,8 +74,6 @@
     }
 
     // Keep browser instances synchronized even when persistent storage is unavailable.
-    // Tests and other non-browser consumers get isolated in-memory managers.
-    if (typeof document === 'undefined') return new VolumePreferenceManager(null);
     transientVolumePreferenceManager ??= new VolumePreferenceManager(null);
     return transientVolumePreferenceManager;
   }
@@ -110,14 +107,14 @@
   }
 
   class MediaPlayerController {
-    constructor(container, config, options = {}) {
-      this.container = container;
+    constructor(container, config) {
+      this.$container = $(container);
       this.config = config;
-      this.media = container.querySelector('audio, video');
-      this.$media = this.media ? $(this.media) : null;
-      this.remainingElement = container.querySelector('.pl-media-player-remaining');
-      this.statusElement = container.querySelector('.pl-media-player-status');
-      this.storage = options.storage ?? this.#browserStorage();
+      this.$media = this.$container.find('audio, video').first();
+      this.media = this.$media[0];
+      this.$remaining = this.$container.find('.pl-media-player-remaining').first();
+      this.$status = this.$container.find('.pl-media-player-status').first();
+      this.storage = this.#browserStorage();
       this.playbackStorageKey = `pl-media-player:v1:${config.variantId}:${config.playerId}`;
       this.volumePreferenceManager = volumePreferenceManager(this.storage);
       this.lastAllowedTime = 0;
@@ -147,9 +144,8 @@
     }
 
     #browserStorage() {
-      if (typeof document === 'undefined') return null;
       try {
-        return globalThis.localStorage ?? null;
+        return localStorage;
       } catch {
         return null;
       }
@@ -206,20 +202,21 @@
     }
 
     #setStatus(message) {
-      if (this.statusElement) this.statusElement.textContent = message;
+      this.$status.text(message);
     }
 
     #renderState() {
-      if (this.remainingElement && this.config.showRemaining) {
+      if (this.config.showRemaining) {
         const remaining = this.budget.remaining;
-        this.remainingElement.textContent =
+        this.$remaining.text(
           remaining === null
             ? 'Unlimited playback attempts.'
-            : `${remaining} playback ${remaining === 1 ? 'attempt' : 'attempts'} remaining.`;
+            : `${remaining} playback ${remaining === 1 ? 'attempt' : 'attempts'} remaining.`,
+        );
       }
       const inactiveAndExhausted = this.budget.exhausted && !this.budget.sessionActive;
-      this.container.dataset.exhausted = String(inactiveAndExhausted);
-      this.media?.setAttribute('aria-disabled', String(inactiveAndExhausted));
+      this.$container.attr('data-exhausted', String(inactiveAndExhausted));
+      this.$media.attr('aria-disabled', String(inactiveAndExhausted));
     }
 
     #denyPlayback() {
@@ -320,22 +317,22 @@
     }
   }
 
-  function initialize(root = document) {
-    for (const container of root.querySelectorAll('[data-pl-media-player-config]')) {
-      if (container.dataset.plMediaPlayerInitialized === 'true') continue;
+  // initialize on load
+  $(() => {
+    $('[data-pl-media-player-config]').each((_index, container) => {
+      const $container = $(container);
+      if ($container.data('pl-media-player-initialized')) return;
       try {
-        const config = JSON.parse(container.dataset.plMediaPlayerConfig);
+        const config = JSON.parse($container.attr('data-pl-media-player-config'));
         new MediaPlayerController(container, config);
-        container.dataset.plMediaPlayerInitialized = 'true';
+        $container.data('pl-media-player-initialized', true);
       } catch (error) {
-        const status = container.querySelector('.pl-media-player-status');
-        if (status) status.textContent = 'The media player could not be initialized.';
+        $container
+          .find('.pl-media-player-status')
+          .first()
+          .text('The media player could not be initialized.');
         console.error('pl-media-player initialization failed', error);
       }
-    }
-  }
-
-  globalThis.PLMediaPlayer = { PlaybackBudget, MediaPlayerController, initialize };
-
-  if (typeof document !== 'undefined') $(() => initialize());
-})();
+    });
+  });
+})(jQuery);

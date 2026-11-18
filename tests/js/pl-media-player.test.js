@@ -1,56 +1,25 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import vm from 'node:vm';
 
-const jqueryEventHandlers = new WeakMap();
-
-globalThis.jQuery = (target) => ({
-  on(events, handler) {
-    if (typeof events === 'object') {
-      for (const [name, callback] of Object.entries(events)) this.on(name, callback);
-      return this;
-    }
-    if (typeof target.addEventListener === 'function') {
-      target.addEventListener(events, handler);
-      return this;
-    }
-    let handlers = jqueryEventHandlers.get(target);
-    if (!handlers) {
-      handlers = new Map();
-      jqueryEventHandlers.set(target, handlers);
-    }
-    const callbacks = handlers.get(events) ?? [];
-    callbacks.push(handler);
-    handlers.set(events, callbacks);
-    return this;
-  },
-
-  trigger(name, parameters = []) {
-    const handlers = jqueryEventHandlers.get(target);
-    for (const handler of handlers?.get(name) ?? []) {
-      handler({ target, type: name }, ...parameters);
-    }
-    return this;
-  },
-});
-
-await import('../../elements/pl-media-player/pl-media-player.js');
-
-const { MediaPlayerController } = globalThis.PLMediaPlayer;
-
-class FakeClassList {
-  toggle() {}
-}
+const PLAYER_SOURCE = await readFile(
+  new URL('../../elements/pl-media-player/pl-media-player.js', import.meta.url),
+  'utf8',
+);
 
 class FakeElement {
   constructor() {
     this.textContent = '';
-    this.dataset = {};
     this.attributes = new Map();
-    this.classList = new FakeClassList();
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
   }
 
   setAttribute(name, value) {
-    this.attributes.set(name, value);
+    this.attributes.set(name, String(value));
   }
 }
 
@@ -67,8 +36,12 @@ class FakeMedia extends EventTarget {
     this.attributes = new Map();
   }
 
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
   setAttribute(name, value) {
-    this.attributes.set(name, value);
+    this.attributes.set(name, String(value));
   }
 
   pause() {
@@ -85,19 +58,20 @@ class FakeMedia extends EventTarget {
   }
 }
 
-class FakeContainer {
-  constructor() {
+class FakeContainer extends FakeElement {
+  constructor(config) {
+    super();
     this.media = new FakeMedia();
     this.remaining = new FakeElement();
     this.status = new FakeElement();
-    this.dataset = {};
+    this.setAttribute('data-pl-media-player-config', JSON.stringify(config));
   }
 
-  querySelector(selector) {
-    if (selector === 'audio, video') return this.media;
-    if (selector === '.pl-media-player-remaining') return this.remaining;
-    if (selector === '.pl-media-player-status') return this.status;
-    return null;
+  find(selector) {
+    if (selector === 'audio, video') return [this.media];
+    if (selector === '.pl-media-player-remaining') return [this.remaining];
+    if (selector === '.pl-media-player-status') return [this.status];
+    return [];
   }
 }
 
@@ -115,9 +89,105 @@ class MemoryStorage {
   }
 }
 
-function controller(overrides = {}, storage = null) {
-  const container = new FakeContainer();
-  const config = {
+function createJQuery(containers) {
+  const data = new WeakMap();
+  const objectEventHandlers = new WeakMap();
+
+  function collection(elements) {
+    const jqueryCollection = {
+      length: elements.length,
+
+      attr(name, value) {
+        if (value === undefined) return elements[0]?.getAttribute(name);
+        for (const element of elements) element.setAttribute(name, value);
+        return jqueryCollection;
+      },
+
+      data(name, value) {
+        if (value === undefined) return data.get(elements[0])?.get(name);
+        for (const element of elements) {
+          let elementData = data.get(element);
+          if (!elementData) {
+            elementData = new Map();
+            data.set(element, elementData);
+          }
+          elementData.set(name, value);
+        }
+        return jqueryCollection;
+      },
+
+      each(callback) {
+        elements.forEach((element, index) => callback(index, element));
+        return jqueryCollection;
+      },
+
+      find(selector) {
+        return collection(elements.flatMap((element) => element.find?.(selector) ?? []));
+      },
+
+      first() {
+        return collection(elements.slice(0, 1));
+      },
+
+      on(events, handler) {
+        if (typeof events === 'object') {
+          for (const [name, callback] of Object.entries(events)) {
+            jqueryCollection.on(name, callback);
+          }
+          return jqueryCollection;
+        }
+
+        for (const element of elements) {
+          if (typeof element.addEventListener === 'function') {
+            element.addEventListener(events, handler);
+            continue;
+          }
+          let handlers = objectEventHandlers.get(element);
+          if (!handlers) {
+            handlers = new Map();
+            objectEventHandlers.set(element, handlers);
+          }
+          const callbacks = handlers.get(events) ?? [];
+          callbacks.push(handler);
+          handlers.set(events, callbacks);
+        }
+        return jqueryCollection;
+      },
+
+      text(value) {
+        if (value === undefined) return elements[0]?.textContent;
+        for (const element of elements) element.textContent = value;
+        return jqueryCollection;
+      },
+
+      trigger(name, parameters = []) {
+        for (const element of elements) {
+          for (const handler of objectEventHandlers.get(element)?.get(name) ?? []) {
+            handler({ target: element, type: name }, ...parameters);
+          }
+        }
+        return jqueryCollection;
+      },
+    };
+
+    elements.forEach((element, index) => {
+      jqueryCollection[index] = element;
+    });
+    return jqueryCollection;
+  }
+
+  return (target) => {
+    if (typeof target === 'function') {
+      target();
+      return collection([]);
+    }
+    if (target === '[data-pl-media-player-config]') return collection(containers);
+    return collection(target == null ? [] : [target]);
+  };
+}
+
+function config(overrides = {}) {
+  return {
     allowMuting: true,
     allowPause: true,
     allowSeeking: true,
@@ -128,94 +198,120 @@ function controller(overrides = {}, storage = null) {
     variantId: '101',
     ...overrides,
   };
-  const instance = new MediaPlayerController(container, config, { storage });
-  return { container, instance };
+}
+
+function container(overrides = {}) {
+  return new FakeContainer(config(overrides));
+}
+
+function loadPlayers(containers, storage = new MemoryStorage()) {
+  const context = {
+    console,
+    jQuery: createJQuery(containers),
+    localStorage: storage,
+  };
+  vm.runInNewContext(PLAYER_SOURCE, context, { filename: 'pl-media-player.js' });
+  return context;
+}
+
+function playbackKey(overrides = {}) {
+  const playerConfig = config(overrides);
+  return `pl-media-player:v1:${playerConfig.variantId}:${playerConfig.playerId}`;
 }
 
 test('initial playback consumes one attempt and pause/resume does not consume another', () => {
-  const { container, instance } = controller();
+  const player = container();
+  loadPlayers([player]);
 
-  container.media.emit('playing');
-  assert.equal(instance.budget.playsUsed, 1);
-  assert.equal(container.remaining.textContent, '1 playback attempt remaining.');
+  player.media.emit('playing');
+  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
 
-  container.media.emit('pause');
-  container.media.emit('playing');
-  assert.equal(instance.budget.playsUsed, 1);
+  player.media.emit('pause');
+  player.media.emit('playing');
+  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
 });
 
 test('replay consumes another attempt and replay after exhaustion is denied', () => {
-  const { container, instance } = controller({ maxPlays: 1 });
+  const player = container({ maxPlays: 1 });
+  loadPlayers([player]);
 
-  container.media.emit('playing');
-  container.media.ended = true;
-  container.media.emit('ended');
-  container.media.ended = false;
-  container.media.emit('play');
+  player.media.emit('playing');
+  player.media.ended = true;
+  player.media.emit('ended');
+  player.media.ended = false;
+  player.media.emit('play');
 
-  assert.equal(instance.budget.playsUsed, 1);
-  assert.equal(container.media.pauseCalls, 1);
-  assert.match(container.status.textContent, /limit reached/i);
+  assert.equal(player.remaining.textContent, '0 playback attempts remaining.');
+  assert.equal(player.media.pauseCalls, 1);
+  assert.match(player.status.textContent, /limit reached/i);
 });
 
 test('disallowed pause is immediately resumed without another attempt', () => {
-  const { container, instance } = controller({ allowPause: false });
+  const player = container({ allowPause: false });
+  loadPlayers([player]);
 
-  container.media.emit('playing');
-  container.media.emit('pause');
+  player.media.emit('playing');
+  player.media.emit('pause');
 
-  assert.equal(container.media.playCalls, 1);
-  assert.equal(instance.budget.playsUsed, 1);
+  assert.equal(player.media.playCalls, 1);
+  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
 });
 
 test('seeking can be prohibited or permitted', () => {
-  const prohibited = controller({ allowSeeking: false });
-  prohibited.container.media.currentTime = 4;
-  prohibited.container.media.emit('timeupdate');
-  prohibited.container.media.currentTime = 10;
-  prohibited.container.media.emit('seeking');
-  assert.equal(prohibited.container.media.currentTime, 4);
+  const prohibited = container({ allowSeeking: false, playerId: 'prohibited' });
+  const permitted = container({ allowSeeking: true, playerId: 'permitted' });
+  loadPlayers([prohibited, permitted]);
 
-  const permitted = controller({ allowSeeking: true });
-  permitted.container.media.currentTime = 10;
-  permitted.container.media.emit('seeking');
-  assert.equal(permitted.container.media.currentTime, 10);
+  prohibited.media.currentTime = 4;
+  prohibited.media.emit('timeupdate');
+  prohibited.media.currentTime = 10;
+  prohibited.media.emit('seeking');
+  assert.equal(prohibited.media.currentTime, 4);
+
+  permitted.media.currentTime = 10;
+  permitted.media.emit('seeking');
+  assert.equal(permitted.media.currentTime, 10);
 });
 
 test('persisted counts survive reload while a new variant is independent', () => {
   const storage = new MemoryStorage();
-  const first = controller({ persist: true, variantId: 'first' }, storage);
-  first.container.media.emit('playing');
+  const first = container({ persist: true, variantId: 'first' });
+  loadPlayers([first], storage);
+  first.media.emit('playing');
 
-  const reloaded = controller({ persist: true, variantId: 'first' }, storage);
-  assert.equal(reloaded.instance.budget.playsUsed, 1);
-  assert.equal(reloaded.instance.budget.sessionActive, false);
+  const reloaded = container({ persist: true, variantId: 'first' });
+  loadPlayers([reloaded], storage);
+  assert.equal(reloaded.remaining.textContent, '1 playback attempt remaining.');
 
-  const nextVariant = controller({ persist: true, variantId: 'second' }, storage);
-  assert.equal(nextVariant.instance.budget.playsUsed, 0);
+  const nextVariant = container({ persist: true, variantId: 'second' });
+  loadPlayers([nextVariant], storage);
+  assert.equal(nextVariant.remaining.textContent, '2 playback attempts remaining.');
 });
 
 test('multiple players use independent storage keys', () => {
   const storage = new MemoryStorage();
-  const first = controller({ persist: true, playerId: 'first' }, storage);
-  const second = controller({ persist: true, playerId: 'second' }, storage);
+  const first = container({ persist: true, playerId: 'first' });
+  const second = container({ persist: true, playerId: 'second' });
+  loadPlayers([first, second], storage);
 
-  first.container.media.emit('playing');
+  first.media.emit('playing');
 
-  assert.equal(first.instance.budget.playsUsed, 1);
-  assert.equal(second.instance.budget.playsUsed, 0);
+  assert.equal(first.remaining.textContent, '1 playback attempt remaining.');
+  assert.equal(second.remaining.textContent, '2 playback attempts remaining.');
   assert.equal(storage.values.size, 1);
 });
 
 test('volume is cached across variants without playback persistence', () => {
   const storage = new MemoryStorage();
-  const first = controller({ persist: false, variantId: 'first' }, storage);
+  const first = container({ variantId: 'first' });
+  loadPlayers([first], storage);
 
-  first.container.media.volume = 0.35;
-  first.container.media.emit('volumechange');
+  first.media.volume = 0.35;
+  first.media.emit('volumechange');
 
-  const next = controller({ persist: false, playerId: 'other', variantId: 'second' }, storage);
-  assert.equal(next.container.media.volume, 0.35);
+  const next = container({ playerId: 'other', variantId: 'second' });
+  loadPlayers([next], storage);
+  assert.equal(next.media.volume, 0.35);
   assert.deepEqual(JSON.parse(storage.getItem('pl-media-player:volume:v1')), {
     volume: 0.35,
     lastAudibleVolume: 0.35,
@@ -223,63 +319,60 @@ test('volume is cached across variants without playback persistence', () => {
 });
 
 test('volume changes synchronize players already initialized on the page', () => {
-  const storage = new MemoryStorage();
-  const first = controller({ playerId: 'first' }, storage);
-  const second = controller({ playerId: 'second' }, storage);
+  const first = container({ playerId: 'first' });
+  const second = container({ playerId: 'second' });
+  loadPlayers([first, second]);
 
-  first.container.media.volume = 0.6;
-  first.container.media.emit('volumechange');
+  first.media.volume = 0.6;
+  first.media.emit('volumechange');
 
-  assert.equal(second.container.media.volume, 0.6);
+  assert.equal(second.media.volume, 0.6);
 });
 
 test('restricted players reject mute and zero while preserving the cached preference', () => {
   const storage = new MemoryStorage();
-  const unrestricted = controller({ allowMuting: true, playerId: 'unrestricted' }, storage);
-  const restricted = controller({ allowMuting: false, playerId: 'restricted' }, storage);
+  const unrestricted = container({ playerId: 'unrestricted' });
+  const restricted = container({ allowMuting: false, playerId: 'restricted' });
+  loadPlayers([unrestricted, restricted], storage);
 
-  unrestricted.container.media.volume = 0.4;
-  unrestricted.container.media.emit('volumechange');
-  unrestricted.container.media.volume = 0;
-  unrestricted.container.media.emit('volumechange');
+  unrestricted.media.volume = 0.4;
+  unrestricted.media.emit('volumechange');
+  unrestricted.media.volume = 0;
+  unrestricted.media.emit('volumechange');
 
-  assert.equal(restricted.container.media.volume, 0.4);
+  assert.equal(restricted.media.volume, 0.4);
   assert.deepEqual(JSON.parse(storage.getItem('pl-media-player:volume:v1')), {
     volume: 0,
     lastAudibleVolume: 0.4,
   });
 
-  restricted.container.media.muted = true;
-  restricted.container.media.emit('volumechange');
-  assert.equal(restricted.container.media.muted, false);
-  assert.equal(restricted.container.media.volume, 0.4);
+  restricted.media.muted = true;
+  restricted.media.emit('volumechange');
+  assert.equal(restricted.media.muted, false);
+  assert.equal(restricted.media.volume, 0.4);
 
-  restricted.container.media.volume = 0;
-  restricted.container.media.emit('volumechange');
-  assert.equal(restricted.container.media.volume, 0.4);
+  restricted.media.volume = 0;
+  restricted.media.emit('volumechange');
+  assert.equal(restricted.media.volume, 0.4);
 
-  const futureUnrestricted = controller(
-    { allowMuting: true, playerId: 'future-unrestricted' },
-    storage,
-  );
-  const futureRestricted = controller(
-    { allowMuting: false, playerId: 'future-restricted' },
-    storage,
-  );
-  assert.equal(futureUnrestricted.container.media.volume, 0);
-  assert.equal(futureRestricted.container.media.volume, 0.4);
+  const futureUnrestricted = container({ playerId: 'future-unrestricted' });
+  const futureRestricted = container({ allowMuting: false, playerId: 'future-restricted' });
+  loadPlayers([futureUnrestricted, futureRestricted], storage);
+  assert.equal(futureUnrestricted.media.volume, 0);
+  assert.equal(futureRestricted.media.volume, 0.4);
 });
 
 test('mute state is neither cached nor synchronized when muting is allowed', () => {
   const storage = new MemoryStorage();
-  const first = controller({ playerId: 'first' }, storage);
-  const second = controller({ playerId: 'second' }, storage);
+  const first = container({ playerId: 'first' });
+  const second = container({ playerId: 'second' });
+  loadPlayers([first, second], storage);
 
-  first.container.media.muted = true;
-  first.container.media.emit('volumechange');
+  first.media.muted = true;
+  first.media.emit('volumechange');
 
-  assert.equal(first.container.media.muted, true);
-  assert.equal(second.container.media.muted, false);
+  assert.equal(first.media.muted, true);
+  assert.equal(second.media.muted, false);
   assert.equal(storage.getItem('pl-media-player:volume:v1'), null);
 });
 
@@ -289,21 +382,25 @@ test('invalid cached volume is ignored and a missing audible value is repaired',
     'pl-media-player:volume:v1',
     JSON.stringify({ volume: 2, lastAudibleVolume: 0.5 }),
   );
-  const invalid = controller({}, invalidStorage);
-  assert.equal(invalid.container.media.volume, 1);
+  const invalid = container();
+  loadPlayers([invalid], invalidStorage);
+  assert.equal(invalid.media.volume, 1);
 
   const zeroStorage = new MemoryStorage();
   zeroStorage.setItem('pl-media-player:volume:v1', JSON.stringify({ volume: 0 }));
-  const restricted = controller({ allowMuting: false }, zeroStorage);
-  assert.equal(restricted.container.media.volume, 1);
+  const restricted = container({ allowMuting: false });
+  loadPlayers([restricted], zeroStorage);
+  assert.equal(restricted.media.volume, 1);
 });
 
 test('a loading failure before playing consumes no attempt', () => {
-  const { container, instance } = controller();
-  container.media.emit('error');
+  const storage = new MemoryStorage();
+  const player = container({ persist: true });
+  loadPlayers([player], storage);
+  player.media.emit('error');
 
-  assert.equal(instance.budget.playsUsed, 0);
-  assert.match(container.status.textContent, /no playback attempt was used/i);
+  assert.equal(storage.getItem(playbackKey({ persist: true })), null);
+  assert.match(player.status.textContent, /no playback attempt was used/i);
 });
 
 test('blocked localStorage does not crash playback', () => {
@@ -315,10 +412,31 @@ test('blocked localStorage does not crash playback', () => {
       throw new Error('blocked');
     },
   };
-  const { container, instance } = controller({ persist: true }, storage);
+  const player = container({ persist: true });
+  assert.doesNotThrow(() => loadPlayers([player], storage));
 
-  assert.doesNotThrow(() => container.media.emit('playing'));
-  container.media.volume = 0.5;
-  assert.doesNotThrow(() => container.media.emit('volumechange'));
-  assert.equal(instance.budget.playsUsed, 1);
+  assert.doesNotThrow(() => player.media.emit('playing'));
+  player.media.volume = 0.5;
+  assert.doesNotThrow(() => player.media.emit('volumechange'));
+  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
+});
+
+test('the implementation does not publish an application API globally', () => {
+  const context = loadPlayers([container()]);
+
+  assert.equal(Object.hasOwn(context, 'PLMediaPlayer'), false);
+  assert.equal(Object.hasOwn(context, 'PlaybackBudget'), false);
+  assert.equal(Object.hasOwn(context, 'MediaPlayerController'), false);
+  assert.equal(Object.hasOwn(context, 'initialize'), false);
+});
+
+test('jQuery initialization data prevents duplicate event handlers', () => {
+  const player = container({ allowPause: false });
+  const context = loadPlayers([player]);
+  vm.runInNewContext(PLAYER_SOURCE, context, { filename: 'pl-media-player.js' });
+
+  player.media.emit('playing');
+  player.media.emit('pause');
+
+  assert.equal(player.media.playCalls, 1);
 });

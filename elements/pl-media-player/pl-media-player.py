@@ -4,6 +4,7 @@ import hashlib
 import itertools
 import json
 import re
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote
@@ -123,13 +124,7 @@ def _persist(element: lxml.html.HtmlElement) -> Persist:
 
 
 def _player_id(element: lxml.html.HtmlElement, instance_index: int) -> str:
-    value = pl.get_string_attrib(element, "player-id", f"auto-{instance_index + 1}")
-    if PLAYER_ID_PATTERN.fullmatch(value) is None:
-        raise ValueError(
-            "player-id must begin with a letter and contain only letters, digits, "
-            "underscores, and hyphens."
-        )
-    return value
+    return pl.get_string_attrib(element, "player-id", f"auto-{instance_index + 1}")
 
 
 def _relative_path(
@@ -162,19 +157,10 @@ def _resolve_within(root: Path, relative: PurePosixPath, *, attribute: str) -> P
     return candidate
 
 
-def _extension_set(
-    element: lxml.html.HtmlElement, media_type: MediaType
-) -> frozenset[str]:
-    if media_type is MediaType.AUDIO:
-        allowed = AUDIO_EXTENSIONS
-    elif media_type is MediaType.VIDEO:
-        allowed = VIDEO_EXTENSIONS
-    else:
-        allowed = SUPPORTED_EXTENSIONS
-
+def _parse_extensions(element: lxml.html.HtmlElement) -> frozenset[str] | None:
     raw = pl.get_string_attrib(element, "extensions", None)
     if raw is None:
-        return allowed
+        return None
 
     values = []
     for item in raw.split(","):
@@ -187,14 +173,7 @@ def _extension_set(
             extension = f".{extension}"
         values.append(extension)
 
-    requested = frozenset(values)
-    unsupported = requested - allowed
-    if unsupported:
-        joined = ", ".join(sorted(unsupported))
-        raise ValueError(
-            f"Unsupported extensions for media-type={media_type.value}: {joined}."
-        )
-    return requested
+    return frozenset(values)
 
 
 def _infer_media_type(file_name: str, requested: MediaType) -> MediaType:
@@ -214,10 +193,7 @@ def _infer_media_type(file_name: str, requested: MediaType) -> MediaType:
 def _max_plays(element: lxml.html.HtmlElement) -> int | None:
     if not pl.has_attrib(element, "max-plays"):
         return None
-    value = pl.get_integer_attrib(element, "max-plays")
-    if value < 1:
-        raise ValueError("max-plays must be at least 1 when provided.")
-    return value
+    return pl.get_integer_attrib(element, "max-plays")
 
 
 def _allow_muting(element: lxml.html.HtmlElement, max_plays: int | None) -> bool:
@@ -233,52 +209,147 @@ def _allow_muting(element: lxml.html.HtmlElement, max_plays: int | None) -> bool
     )
 
 
-def _select_file(
-    element: lxml.html.HtmlElement,
-    data: pl.QuestionData,
-    *,
-    directory: Directory,
-    media_type: MediaType,
-    player_id: str,
-) -> str:
-    file_name = pl.get_string_attrib(element, "file-name", None)
-    source_directory = pl.get_string_attrib(element, "source-directory", None)
-    randomize = pl.get_boolean_attrib(element, "randomize", False)
-    has_extensions = pl.has_attrib(element, "extensions")
+@dataclass(frozen=True, kw_only=True)
+class Config:
+    """Validated element configuration shared by prepare and render."""
 
-    if file_name is not None:
-        if source_directory is not None or randomize or has_extensions:
+    allow_muting: bool
+    allow_pause: bool
+    allow_seeking: bool
+    directory: Directory
+    extensions: frozenset[str] | None
+    file_name: str | None
+    max_plays: int | None
+    media_type: MediaType
+    persist: Persist
+    player_id: str
+    randomize: bool
+    show_remaining: bool
+    source_directory: str | None
+
+    def __post_init__(self) -> None:
+        if self.max_plays is not None and self.max_plays < 1:
+            raise ValueError("max-plays must be at least 1 when provided.")
+        if PLAYER_ID_PATTERN.fullmatch(self.player_id) is None:
             raise ValueError(
-                "file-name cannot be combined with source-directory, randomize=true, "
-                "or extensions."
+                "player-id must begin with a letter and contain only letters, digits, "
+                "underscores, and hyphens."
             )
-        relative = _relative_path(file_name, attribute="file-name")
-        path = _resolve_within(_root(data, directory), relative, attribute="file-name")
-        if not path.is_file():
-            raise FileNotFoundError(
-                f'File "{file_name}" not found in directory "{directory.value}".'
-            )
-        _infer_media_type(file_name, media_type)
-        return relative.as_posix()
 
-    if not randomize or source_directory is None:
-        raise ValueError(
-            "Provide file-name, or set both source-directory and randomize=true."
+        if self.extensions is not None:
+            if not self.extensions:
+                raise ValueError("extensions must contain at least one entry.")
+            unsupported = self.extensions - self.default_extensions
+            if unsupported:
+                joined = ", ".join(sorted(unsupported))
+                raise ValueError(
+                    f"Unsupported extensions for media-type={self.media_type.value}: "
+                    f"{joined}."
+                )
+
+        if self.file_name is not None:
+            if (
+                self.source_directory is not None
+                or self.randomize
+                or self.extensions is not None
+            ):
+                raise ValueError(
+                    "file-name cannot be combined with source-directory, randomize=true, "
+                    "or extensions."
+                )
+            _relative_path(self.file_name, attribute="file-name")
+            _infer_media_type(self.file_name, self.media_type)
+        else:
+            if not self.randomize or self.source_directory is None:
+                raise ValueError(
+                    "Provide file-name, or set both source-directory and randomize=true."
+                )
+            _relative_path(
+                self.source_directory, attribute="source-directory", allow_dot=True
+            )
+
+    @classmethod
+    def from_element(
+        cls, element: lxml.html.HtmlElement, instance_index: int
+    ) -> Config:
+        pl.check_attribs(
+            element, required_attribs=[], optional_attribs=OPTIONAL_ATTRIBUTES
+        )
+        directory = _directory(element)
+        media_type = _media_type(element)
+        max_plays = _max_plays(element)
+        return cls(
+            allow_muting=_allow_muting(element, max_plays),
+            allow_pause=pl.get_boolean_attrib(element, "allow-pause", True),
+            allow_seeking=pl.get_boolean_attrib(element, "allow-seeking", True),
+            directory=directory,
+            extensions=_parse_extensions(element),
+            file_name=pl.get_string_attrib(element, "file-name", None),
+            max_plays=max_plays,
+            media_type=media_type,
+            persist=_persist(element),
+            player_id=_player_id(element, instance_index),
+            randomize=pl.get_boolean_attrib(element, "randomize", False),
+            show_remaining=pl.get_boolean_attrib(element, "show-remaining", True),
+            source_directory=pl.get_string_attrib(element, "source-directory", None),
         )
 
+    @property
+    def default_extensions(self) -> frozenset[str]:
+        if self.media_type is MediaType.AUDIO:
+            return AUDIO_EXTENSIONS
+        if self.media_type is MediaType.VIDEO:
+            return VIDEO_EXTENSIONS
+        return SUPPORTED_EXTENSIONS
+
+    @property
+    def discovery_extensions(self) -> frozenset[str]:
+        return self.extensions or self.default_extensions
+
+    def to_client_dict(self, variant_id: str) -> dict[str, bool | int | str | None]:
+        return {
+            "allowMuting": self.allow_muting,
+            "allowPause": self.allow_pause,
+            "allowSeeking": self.allow_seeking,
+            "maxPlays": self.max_plays,
+            "persist": self.persist is Persist.VARIANT,
+            "playerId": self.player_id,
+            "showRemaining": self.show_remaining,
+            "variantId": variant_id,
+        }
+
+
+def _select_file(
+    config: Config,
+    data: pl.QuestionData,
+) -> str:
+    if config.file_name is not None:
+        relative = _relative_path(config.file_name, attribute="file-name")
+        path = _resolve_within(
+            _root(data, config.directory), relative, attribute="file-name"
+        )
+        if not path.is_file():
+            raise FileNotFoundError(
+                f'File "{config.file_name}" not found in directory '
+                f'"{config.directory.value}".'
+            )
+        return relative.as_posix()
+
+    assert config.source_directory is not None
     relative_directory = _relative_path(
-        source_directory, attribute="source-directory", allow_dot=True
+        config.source_directory, attribute="source-directory", allow_dot=True
     )
-    root = _root(data, directory)
+    root = _root(data, config.directory)
     discovery_path = _resolve_within(
         root, relative_directory, attribute="source-directory"
     )
     if not discovery_path.is_dir():
         raise FileNotFoundError(
-            f'Directory "{source_directory}" not found in "{directory.value}".'
+            f'Directory "{config.source_directory}" not found in '
+            f'"{config.directory.value}".'
         )
 
-    extensions = _extension_set(element, media_type)
+    extensions = config.discovery_extensions
     candidates = []
     for path in discovery_path.iterdir():
         if not path.is_file() or path.suffix.lower() not in extensions:
@@ -294,15 +365,16 @@ def _select_file(
     candidates.sort()
     if not candidates:
         raise ValueError(
-            f'No supported media files found in "{directory.value}/{source_directory}".'
+            f"No supported media files found in "
+            f'"{config.directory.value}/{config.source_directory}".'
         )
 
     seed = ":".join(
         [
             str(data["variant_seed"]),
-            player_id,
-            directory.value,
-            source_directory,
+            config.player_id,
+            config.directory.value,
+            config.source_directory,
             *candidates,
         ]
     )
@@ -321,34 +393,19 @@ def _prepare_with_index(
     element_html: str | bytes, data: pl.QuestionData, instance_index: int
 ) -> None:
     element = _element(element_html)
-    pl.check_attribs(element, required_attribs=[], optional_attribs=OPTIONAL_ATTRIBUTES)
-
-    directory = _directory(element)
-    requested_media_type = _media_type(element)
-    _persist(element)
-    max_plays = _max_plays(element)
-    _allow_muting(element, max_plays)
-    pl.get_boolean_attrib(element, "allow-pause", True)
-    pl.get_boolean_attrib(element, "allow-seeking", True)
-    pl.get_boolean_attrib(element, "show-remaining", True)
-    player_id = _player_id(element, instance_index)
+    config = Config.from_element(element, instance_index)
 
     state = _state(data)
-    if player_id in state:
+    if config.player_id in state:
         raise ValueError(
-            f'Duplicate player-id "{player_id}". Each pl-media-player needs a unique identity.'
+            f'Duplicate player-id "{config.player_id}". '
+            "Each pl-media-player needs a unique identity."
         )
 
-    file_name = _select_file(
-        element,
-        data,
-        directory=directory,
-        media_type=requested_media_type,
-        player_id=player_id,
-    )
-    resolved_media_type = _infer_media_type(file_name, requested_media_type)
-    state[player_id] = {
-        "directory": directory.value,
+    file_name = _select_file(config, data)
+    resolved_media_type = _infer_media_type(file_name, config.media_type)
+    state[config.player_id] = {
+        "directory": config.directory.value,
         "file_name": file_name,
         "media_type": resolved_media_type.value,
     }
@@ -366,41 +423,31 @@ def _render_with_index(
     element_html: str | bytes, data: pl.QuestionData, instance_index: int
 ) -> str:
     element = _element(element_html)
-    player_id = _player_id(element, instance_index)
+    config = Config.from_element(element, instance_index)
     state = data["params"].get(PARAMS_KEY, {})
-    if not isinstance(state, dict) or player_id not in state:
+    if not isinstance(state, dict) or config.player_id not in state:
         raise ValueError(
-            f'No prepared media selection exists for player-id "{player_id}". '
+            f'No prepared media selection exists for player-id "{config.player_id}". '
             "Regenerate the question variant."
         )
-    selection = state[player_id]
+    selection = state[config.player_id]
     directory = Directory(selection["directory"])
     file_name = selection["file_name"]
     media_type = MediaType(selection["media_type"])
 
     base_url = str(data["options"][DIRECTORY_URL_OPTIONS[directory]]).rstrip("/")
     src = f"{base_url}/{_url_path(file_name)}"
-    max_plays = _max_plays(element)
-    show_remaining = pl.get_boolean_attrib(element, "show-remaining", True)
     dom_id = pl.get_uuid()
-    config = {
-        "allowMuting": _allow_muting(element, max_plays),
-        "allowPause": pl.get_boolean_attrib(element, "allow-pause", True),
-        "allowSeeking": pl.get_boolean_attrib(element, "allow-seeking", True),
-        "maxPlays": max_plays,
-        "persist": _persist(element) is Persist.VARIANT,
-        "playerId": player_id,
-        "showRemaining": show_remaining,
-        "variantId": str(data["options"].get("variant_id", data["variant_seed"])),
-    }
+    variant_id = str(data["options"].get("variant_id", data["variant_seed"]))
+    client_config = config.to_client_dict(variant_id)
 
     params = {
         "audio": media_type is MediaType.AUDIO,
-        "config_json": json.dumps(config, separators=(",", ":")),
+        "config_json": json.dumps(client_config, separators=(",", ":")),
         "dom_id": dom_id,
         "file_name": file_name,
         "mime_type": MIME_TYPES[PurePosixPath(file_name).suffix.lower()],
-        "show_remaining": show_remaining,
+        "show_remaining": config.show_remaining,
         "src": src,
         "video": media_type is MediaType.VIDEO,
     }
