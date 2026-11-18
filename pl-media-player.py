@@ -276,7 +276,7 @@ def _allow_muting(element: lxml.html.HtmlElement, max_plays: int | None) -> bool
     )
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, kw_only=True, slots=True)
 class Config:
     """Validated element configuration shared by prepare and render."""
 
