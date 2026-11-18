@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 import chevron
 import lxml.html
@@ -61,6 +61,7 @@ MIME_TYPES = {
 
 PARAMS_KEY = "_pl_media_player"
 PLAYER_ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
+YOUTUBE_VIDEO_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 OPTIONAL_ATTRIBUTES = [
     "allow-muting",
     "allow-pause",
@@ -75,6 +76,7 @@ OPTIONAL_ATTRIBUTES = [
     "randomize",
     "show-remaining",
     "source-directory",
+    "url",
 ]
 
 # PrairieLearn loads a fresh controller module for each lifecycle phase and invokes
@@ -190,6 +192,71 @@ def _infer_media_type(file_name: str, requested: MediaType) -> MediaType:
     return inferred
 
 
+def _validate_url(url: str) -> None:
+    if not url or any(character.isspace() for character in url) or "\0" in url:
+        raise ValueError("url must be a nonempty, properly escaped HTTP(S) URL.")
+
+    try:
+        parsed = urlsplit(url)
+        hostname = parsed.hostname
+    except ValueError as exc:
+        raise ValueError("url must be a valid absolute HTTP(S) URL.") from exc
+    if parsed.scheme not in {"http", "https"} or hostname is None:
+        raise ValueError("url must be a valid absolute HTTP(S) URL.")
+
+
+def _url_extension(url: str) -> str:
+    return PurePosixPath(unquote(urlsplit(url).path)).suffix.lower()
+
+
+def _youtube_embed_url(url: str) -> str | None:
+    parsed = urlsplit(url)
+    hostname = parsed.hostname
+    if hostname is None:
+        return None
+    hostname = hostname.lower()
+    youtube_host = hostname == "youtube.com" or hostname.endswith(".youtube.com")
+    youtube_host = youtube_host or hostname == "youtube-nocookie.com"
+    youtube_host = youtube_host or hostname.endswith(".youtube-nocookie.com")
+    short_host = hostname == "youtu.be" or hostname.endswith(".youtu.be")
+    if not youtube_host and not short_host:
+        return None
+
+    parts = [part for part in parsed.path.split("/") if part]
+    video_id = None
+    if short_host and parts:
+        video_id = parts[0]
+    elif youtube_host:
+        if parsed.path.rstrip("/") == "/watch":
+            video_id = next(iter(parse_qs(parsed.query).get("v", [])), None)
+        elif len(parts) >= 2 and parts[0] in {"embed", "live", "shorts", "v"}:
+            video_id = parts[1]
+
+    if video_id is None or YOUTUBE_VIDEO_ID_PATTERN.fullmatch(video_id) is None:
+        raise ValueError(
+            "YouTube url must identify a video using a watch, share, shorts, live, "
+            "or embed URL."
+        )
+    return f"https://www.youtube.com/embed/{video_id}"
+
+
+def _infer_url_media_type(url: str, requested: MediaType) -> MediaType:
+    extension = _url_extension(url)
+    if extension in SUPPORTED_EXTENSIONS:
+        inferred = MediaType.AUDIO if extension in AUDIO_EXTENSIONS else MediaType.VIDEO
+        if requested is not MediaType.AUTO and requested is not inferred:
+            raise ValueError(
+                f'url "{url}" is {inferred.value} media, not {requested.value} media.'
+            )
+        return inferred
+    if requested is MediaType.AUTO:
+        raise ValueError(
+            f'Cannot infer the media type from url "{url}"; set media-type to audio '
+            "or video."
+        )
+    return requested
+
+
 def _max_plays(element: lxml.html.HtmlElement) -> int | None:
     if not pl.has_attrib(element, "max-plays"):
         return None
@@ -226,6 +293,7 @@ class Config:
     randomize: bool
     show_remaining: bool
     source_directory: str | None
+    url: str | None
 
     def __post_init__(self) -> None:
         if self.max_plays is not None and self.max_plays < 1:
@@ -250,19 +318,34 @@ class Config:
         if self.file_name is not None:
             if (
                 self.source_directory is not None
+                or self.url is not None
                 or self.randomize
                 or self.extensions is not None
             ):
                 raise ValueError(
-                    "file-name cannot be combined with source-directory, randomize=true, "
-                    "or extensions."
+                    "file-name cannot be combined with url, source-directory, "
+                    "randomize=true, or extensions."
                 )
             _relative_path(self.file_name, attribute="file-name")
             _infer_media_type(self.file_name, self.media_type)
+        elif self.url is not None:
+            if (
+                self.source_directory is not None
+                or self.randomize
+                or self.extensions is not None
+            ):
+                raise ValueError(
+                    "url cannot be combined with source-directory, randomize=true, "
+                    "or extensions."
+                )
+            _validate_url(self.url)
+            if _youtube_embed_url(self.url) is None:
+                _infer_url_media_type(self.url, self.media_type)
         else:
             if not self.randomize or self.source_directory is None:
                 raise ValueError(
-                    "Provide file-name, or set both source-directory and randomize=true."
+                    "Provide file-name or url, or set both source-directory and "
+                    "randomize=true."
                 )
             _relative_path(
                 self.source_directory, attribute="source-directory", allow_dot=True
@@ -275,6 +358,21 @@ class Config:
         pl.check_attribs(
             element, required_attribs=[], optional_attribs=OPTIONAL_ATTRIBUTES
         )
+        url = pl.get_string_attrib(element, "url", None)
+        if url is not None:
+            _validate_url(url)
+            if _youtube_embed_url(url) is not None:
+                conflicts = [
+                    attribute
+                    for attribute in OPTIONAL_ATTRIBUTES
+                    if attribute != "url" and pl.has_attrib(element, attribute)
+                ]
+                if conflicts:
+                    raise ValueError(
+                        "A YouTube url cannot be combined with other attributes: "
+                        f"{', '.join(conflicts)}."
+                    )
+
         directory = _directory(element)
         media_type = _media_type(element)
         max_plays = _max_plays(element)
@@ -292,6 +390,7 @@ class Config:
             randomize=pl.get_boolean_attrib(element, "randomize", False),
             show_remaining=pl.get_boolean_attrib(element, "show-remaining", True),
             source_directory=pl.get_string_attrib(element, "source-directory", None),
+            url=url,
         )
 
     @property
@@ -402,13 +501,25 @@ def _prepare_with_index(
             "Each pl-media-player needs a unique identity."
         )
 
-    file_name = _select_file(config, data)
-    resolved_media_type = _infer_media_type(file_name, config.media_type)
-    state[config.player_id] = {
-        "directory": config.directory.value,
-        "file_name": file_name,
-        "media_type": resolved_media_type.value,
-    }
+    if config.url is not None:
+        youtube_embed_url = _youtube_embed_url(config.url)
+        if youtube_embed_url is not None:
+            state[config.player_id] = {"youtube_embed_url": youtube_embed_url}
+        else:
+            state[config.player_id] = {
+                "media_type": _infer_url_media_type(
+                    config.url, config.media_type
+                ).value,
+                "url": config.url,
+            }
+    else:
+        file_name = _select_file(config, data)
+        resolved_media_type = _infer_media_type(file_name, config.media_type)
+        state[config.player_id] = {
+            "directory": config.directory.value,
+            "file_name": file_name,
+            "media_type": resolved_media_type.value,
+        }
 
 
 def prepare(element_html: str, data: pl.QuestionData) -> None:
@@ -431,12 +542,24 @@ def _render_with_index(
             "Regenerate the question variant."
         )
     selection = state[config.player_id]
-    directory = Directory(selection["directory"])
-    file_name = selection["file_name"]
-    media_type = MediaType(selection["media_type"])
-
-    base_url = str(data["options"][DIRECTORY_URL_OPTIONS[directory]]).rstrip("/")
-    src = f"{base_url}/{_url_path(file_name)}"
+    youtube = "youtube_embed_url" in selection
+    media_type = None
+    extension = ""
+    if youtube:
+        src = selection["youtube_embed_url"]
+    else:
+        media_type = MediaType(selection["media_type"])
+        if "url" in selection:
+            src = selection["url"]
+            extension = _url_extension(src)
+        else:
+            directory = Directory(selection["directory"])
+            file_name = selection["file_name"]
+            base_url = str(data["options"][DIRECTORY_URL_OPTIONS[directory]]).rstrip(
+                "/"
+            )
+            src = f"{base_url}/{_url_path(file_name)}"
+            extension = PurePosixPath(file_name).suffix.lower()
     dom_id = pl.get_uuid()
     variant_id = str(data["options"].get("variant_id", data["variant_seed"]))
     client_config = config.to_client_dict(variant_id)
@@ -445,11 +568,11 @@ def _render_with_index(
         "audio": media_type is MediaType.AUDIO,
         "config_json": json.dumps(client_config, separators=(",", ":")),
         "dom_id": dom_id,
-        "file_name": file_name,
-        "mime_type": MIME_TYPES[PurePosixPath(file_name).suffix.lower()],
+        "mime_type": MIME_TYPES.get(extension),
         "show_remaining": config.show_remaining,
         "src": src,
         "video": media_type is MediaType.VIDEO,
+        "youtube": youtube,
     }
     template = (
         Path(__file__).with_name("pl-media-player.mustache").read_text(encoding="utf-8")

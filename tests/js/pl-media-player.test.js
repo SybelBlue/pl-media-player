@@ -8,10 +8,14 @@ const PLAYER_SOURCE = await readFile(
   'utf8',
 );
 
-class FakeElement {
+class FakeElement extends EventTarget {
   constructor() {
+    super();
     this.textContent = '';
     this.attributes = new Map();
+    this.disabled = false;
+    this.hidden = false;
+    this.value = '';
   }
 
   getAttribute(name) {
@@ -21,27 +25,33 @@ class FakeElement {
   setAttribute(name, value) {
     this.attributes.set(name, String(value));
   }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
+
+  emit(name, properties = {}) {
+    const event = new Event(name, { cancelable: true });
+    for (const [key, value] of Object.entries(properties)) {
+      Object.defineProperty(event, key, { value });
+    }
+    this.dispatchEvent(event);
+  }
 }
 
-class FakeMedia extends EventTarget {
+class FakeMedia extends FakeElement {
   constructor() {
     super();
+    this.controls = true;
     this.currentTime = 0;
+    this.duration = 120;
     this.ended = false;
     this.muted = false;
+    this.paused = true;
     this.seeking = false;
     this.volume = 1;
     this.pauseCalls = 0;
     this.playCalls = 0;
-    this.attributes = new Map();
-  }
-
-  getAttribute(name) {
-    return this.attributes.get(name) ?? null;
-  }
-
-  setAttribute(name, value) {
-    this.attributes.set(name, String(value));
   }
 
   pause() {
@@ -53,8 +63,10 @@ class FakeMedia extends EventTarget {
     return Promise.resolve();
   }
 
-  emit(name) {
-    this.dispatchEvent(new Event(name));
+  emit(name, properties = {}) {
+    if (name === 'play' || name === 'playing') this.paused = false;
+    if (name === 'pause' || name === 'ended') this.paused = true;
+    super.emit(name, properties);
   }
 }
 
@@ -62,6 +74,21 @@ class FakeContainer extends FakeElement {
   constructor(config) {
     super();
     this.media = new FakeMedia();
+    this.controls = new FakeElement();
+    this.controls.hidden = true;
+    this.playLock = new FakeElement();
+    this.playButton = new FakeElement();
+    this.playButton.setAttribute('class', 'pl-media-player-play btn btn-outline-secondary btn-sm');
+    this.playTooltip = new FakeElement();
+    this.seekLock = new FakeElement();
+    this.seek = new FakeElement();
+    this.seekTooltip = new FakeElement();
+    this.time = new FakeElement();
+    this.muteLock = new FakeElement();
+    this.muteButton = new FakeElement();
+    this.muteButton.setAttribute('class', 'pl-media-player-mute btn btn-outline-secondary btn-sm');
+    this.muteTooltip = new FakeElement();
+    this.volume = new FakeElement();
     this.remaining = new FakeElement();
     this.status = new FakeElement();
     this.setAttribute('data-pl-media-player-config', JSON.stringify(config));
@@ -69,6 +96,18 @@ class FakeContainer extends FakeElement {
 
   find(selector) {
     if (selector === 'audio, video') return [this.media];
+    if (selector === '.pl-media-player-controls') return [this.controls];
+    if (selector === '.pl-media-player-play-lock') return [this.playLock];
+    if (selector === '.pl-media-player-play') return [this.playButton];
+    if (selector === '.pl-media-player-play-tooltip') return [this.playTooltip];
+    if (selector === '.pl-media-player-seek-lock') return [this.seekLock];
+    if (selector === '.pl-media-player-seek') return [this.seek];
+    if (selector === '.pl-media-player-seek-tooltip') return [this.seekTooltip];
+    if (selector === '.pl-media-player-time') return [this.time];
+    if (selector === '.pl-media-player-mute-lock') return [this.muteLock];
+    if (selector === '.pl-media-player-mute') return [this.muteButton];
+    if (selector === '.pl-media-player-mute-tooltip') return [this.muteTooltip];
+    if (selector === '.pl-media-player-volume') return [this.volume];
     if (selector === '.pl-media-player-remaining') return [this.remaining];
     if (selector === '.pl-media-player-status') return [this.status];
     return [];
@@ -100,6 +139,35 @@ function createJQuery(containers) {
       attr(name, value) {
         if (value === undefined) return elements[0]?.getAttribute(name);
         for (const element of elements) element.setAttribute(name, value);
+        return jqueryCollection;
+      },
+
+      removeAttr(name) {
+        for (const element of elements) element.removeAttribute(name);
+        return jqueryCollection;
+      },
+
+      prop(name, value) {
+        if (value === undefined) return elements[0]?.[name];
+        for (const element of elements) element[name] = value;
+        return jqueryCollection;
+      },
+
+      val(value) {
+        if (value === undefined) return elements[0]?.value;
+        for (const element of elements) element.value = String(value);
+        return jqueryCollection;
+      },
+
+      toggleClass(className, state) {
+        for (const element of elements) {
+          const classes = new Set(
+            (element.getAttribute('class') ?? '').split(/\s+/).filter(Boolean),
+          );
+          if (state) classes.add(className);
+          else classes.delete(className);
+          element.setAttribute('class', [...classes].join(' '));
+        }
         return jqueryCollection;
       },
 
@@ -138,18 +206,20 @@ function createJQuery(containers) {
         }
 
         for (const element of elements) {
-          if (typeof element.addEventListener === 'function') {
-            element.addEventListener(events, handler);
-            continue;
+          for (const eventName of events.split(/\s+/)) {
+            if (typeof element.addEventListener === 'function') {
+              element.addEventListener(eventName, handler);
+              continue;
+            }
+            let handlers = objectEventHandlers.get(element);
+            if (!handlers) {
+              handlers = new Map();
+              objectEventHandlers.set(element, handlers);
+            }
+            const callbacks = handlers.get(eventName) ?? [];
+            callbacks.push(handler);
+            handlers.set(eventName, callbacks);
           }
-          let handlers = objectEventHandlers.get(element);
-          if (!handlers) {
-            handlers = new Map();
-            objectEventHandlers.set(element, handlers);
-          }
-          const callbacks = handlers.get(events) ?? [];
-          callbacks.push(handler);
-          handlers.set(events, callbacks);
         }
         return jqueryCollection;
       },
@@ -219,6 +289,14 @@ function playbackKey(overrides = {}) {
   return `pl-media-player:v1:${playerConfig.variantId}:${playerConfig.playerId}`;
 }
 
+test('unlimited playback does not show a remaining-attempt message', () => {
+  const player = container({ maxPlays: null });
+  loadPlayers([player]);
+
+  assert.equal(player.remaining.textContent, '');
+  assert.equal(player.remaining.hidden, true);
+});
+
 test('initial playback consumes one attempt and pause/resume does not consume another', () => {
   const player = container();
   loadPlayers([player]);
@@ -255,6 +333,122 @@ test('disallowed pause is immediately resumed without another attempt', () => {
 
   assert.equal(player.media.playCalls, 1);
   assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
+});
+
+test('a prohibited pause disables the button and explains the lockout when pressed', () => {
+  const player = container({ allowPause: false });
+  loadPlayers([player]);
+
+  assert.equal(player.media.controls, false);
+  assert.equal(player.controls.hidden, false);
+  assert.equal(player.playButton.disabled, false);
+  assert.equal(player.playButton.textContent, 'Play');
+
+  player.media.emit('playing');
+
+  assert.equal(player.playButton.disabled, true);
+  assert.equal(player.playButton.textContent, 'Pause');
+  assert.equal(player.playLock.getAttribute('data-locked'), 'true');
+  assert.equal(player.playLock.getAttribute('tabindex'), '0');
+  assert.match(player.playTooltip.textContent, /pausing is disabled/i);
+
+  player.playLock.emit('click');
+
+  assert.match(player.status.textContent, /pausing is disabled/i);
+  assert.equal(player.playLock.getAttribute('data-show-tooltip'), 'true');
+  assert.equal(player.media.pauseCalls, 0);
+});
+
+test('a final unpausable attempt is red and warned about before playback', () => {
+  const player = container({ allowPause: false, maxPlays: 1 });
+  loadPlayers([player]);
+
+  assert.equal(player.playButton.disabled, false);
+  assert.equal(player.playButton.textContent, 'Play');
+  assert.equal(player.playButton.getAttribute('data-warning'), 'true');
+  assert.match(player.playButton.getAttribute('class'), /\bbtn-danger\b/);
+  assert.doesNotMatch(player.playButton.getAttribute('class'), /\bbtn-outline-secondary\b/);
+  assert.match(player.status.textContent, /last playback attempt/i);
+  assert.match(player.status.textContent, /cannot be paused/i);
+
+  player.media.emit('playing');
+
+  assert.equal(player.playButton.disabled, true);
+  assert.equal(player.playButton.getAttribute('data-warning'), 'false');
+  assert.doesNotMatch(player.playButton.getAttribute('class'), /\bbtn-danger\b/);
+  assert.match(player.playButton.getAttribute('class'), /\bbtn-outline-secondary\b/);
+  assert.equal(player.status.textContent, '');
+});
+
+test('the warning appears when a later playback becomes the final unpausable attempt', () => {
+  const player = container({ allowPause: false, maxPlays: 2 });
+  loadPlayers([player]);
+
+  assert.equal(player.playButton.getAttribute('data-warning'), 'false');
+  assert.equal(player.status.textContent, '');
+
+  player.media.emit('playing');
+  player.media.ended = true;
+  player.media.emit('ended');
+
+  assert.equal(player.playButton.disabled, false);
+  assert.equal(player.playButton.getAttribute('data-warning'), 'true');
+  assert.match(player.status.textContent, /last playback attempt/i);
+});
+
+test('enabled custom controls play, pause, seek, mute, and adjust volume', () => {
+  const player = container();
+  loadPlayers([player]);
+
+  player.playButton.emit('click');
+  assert.equal(player.media.playCalls, 1);
+
+  player.media.emit('playing');
+  player.playButton.emit('click');
+  assert.equal(player.media.pauseCalls, 1);
+
+  player.seek.value = '42';
+  player.seek.emit('input');
+  assert.equal(player.media.currentTime, 42);
+
+  player.muteButton.emit('click');
+  assert.equal(player.media.muted, true);
+
+  player.volume.value = '0.3';
+  player.volume.emit('input');
+  assert.equal(player.media.volume, 0.3);
+});
+
+test('locked controls expose warnings to pointer and keyboard users', () => {
+  const player = container({ allowMuting: false, allowSeeking: false });
+  loadPlayers([player]);
+
+  assert.equal(player.muteButton.disabled, true);
+  assert.equal(player.seek.disabled, true);
+  assert.match(player.muteTooltip.textContent, /muting is disabled/i);
+  assert.match(player.seekTooltip.textContent, /seeking is disabled/i);
+
+  player.muteLock.emit('keydown', { key: 'Enter' });
+  assert.match(player.status.textContent, /muting is disabled/i);
+
+  player.seekLock.emit('click');
+  assert.match(player.status.textContent, /seeking is disabled/i);
+});
+
+test('play is disabled with a warning once all attempts are exhausted', () => {
+  const player = container({ maxPlays: 1 });
+  loadPlayers([player]);
+
+  player.media.emit('playing');
+  player.media.ended = true;
+  player.media.emit('ended');
+
+  assert.equal(player.playButton.disabled, true);
+  assert.equal(player.playButton.textContent, 'Play');
+  assert.match(player.playTooltip.textContent, /limit reached/i);
+
+  player.playLock.emit('click');
+  assert.match(player.status.textContent, /limit reached/i);
 });
 
 test('seeking can be prohibited or permitted', () => {

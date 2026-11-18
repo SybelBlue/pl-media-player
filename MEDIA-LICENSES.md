@@ -11,3 +11,9 @@ copies of the same six-second excerpt from _Big Buck Bunny_:
 - Licensed under [Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/)
 - Source: the official 320×180 MP4 release from `download.blender.org`
 - Change: transcoded to an Apple M4V/H.264 demonstration clip and trimmed to six seconds
+
+The external-resource demos do not redistribute their media:
+
+- `external-audio` loads the T. rex sample from MDN's `cc0-audio` collection.
+- `youtube` embeds the official Blender Foundation upload of _Big Buck Bunny_, covered by the
+  attribution and license above.

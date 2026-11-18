@@ -10,7 +10,7 @@ distribution.
 
 ## Features
 
-- Native HTML audio and video playback using PrairieLearn's bundled jQuery.
+- Accessible audio and video controls with native HTML media playback.
 - Unlimited playback or a positive `max-plays` session budget.
 - Pause/resume within one session without double-counting.
 - Optional pause and seeking restrictions.
@@ -19,6 +19,7 @@ distribution.
 - Optional remaining-attempt display and clear exhaustion feedback.
 - Optional browser-local, variant-scoped persistence.
 - Explicit question-local or course-local files.
+- External media from HTTP(S) URLs, including embedded YouTube videos.
 - Manifest-free random selection from a directory during `prepare()`.
 - Independent state for multiple players in one question.
 
@@ -106,6 +107,30 @@ Course-local media is also supported:
 ></pl-media-player>
 ```
 
+External media can be loaded from an absolute HTTP(S) URL:
+
+```html
+<pl-media-player url="https://cdn.example.com/listening-prompt.mp3"></pl-media-player>
+```
+
+For extensionless URLs and streaming endpoints, specify the media family explicitly:
+
+```html
+<pl-media-player
+  media-type="video"
+  url="https://media.example.com/playback?id=example"
+></pl-media-player>
+```
+
+YouTube watch, share, Shorts, live, and embed URLs are converted to an HTTPS embed:
+
+```html
+<pl-media-player url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"></pl-media-player>
+```
+
+A YouTube URL must be the element's only attribute. Playback budgets, persistence, and the native
+pause, seek, and mute restrictions do not apply inside the YouTube iframe.
+
 Publicly shared PrairieLearn questions should use `clientFilesQuestion`: shared questions cannot
 depend on the source course's `clientFilesCourse`.
 
@@ -114,6 +139,7 @@ depend on the source course's `clientFilesCourse`.
 | Attribute          | Default               | Description                                                                           |
 | ------------------ | --------------------- | ------------------------------------------------------------------------------------- |
 | `file-name`        | —                     | Explicit POSIX-relative path below the selected client-files root.                    |
+| `url`              | —                     | Absolute HTTP(S) media or YouTube URL; mutually exclusive with other source options.  |
 | `directory`        | `clientFilesQuestion` | `clientFilesQuestion` or `clientFilesCourse`.                                         |
 | `source-directory` | —                     | Direct-child discovery directory used with `randomize="true"`.                        |
 | `randomize`        | `false`               | Select and persist one eligible file during variant preparation.                      |
@@ -123,7 +149,7 @@ depend on the source course's `clientFilesCourse`.
 | `allow-seeking`    | `true`                | Permit moving within the active session.                                              |
 | `show-remaining`   | `true`                | Show the remaining session count or the unlimited label.                              |
 | `persist`          | `none`                | `none` or browser-local `variant` persistence.                                        |
-| `media-type`       | `auto`                | `auto`, `audio`, or `video`; explicit types validate the extension.                   |
+| `media-type`       | `auto`                | `auto`, `audio`, or `video`; required for URLs without a recognized extension.        |
 | `extensions`       | supported formats     | Comma-separated discovery filter; only valid with random selection.                   |
 | `player-id`        | document-order ID     | Stable identifier. Set it explicitly when persistence must survive markup reordering. |
 
@@ -149,15 +175,14 @@ the native muted state is not. When a player disallows muting, it uses the last 
 volume instead of a saved zero without erasing the zero-volume preference for unrestricted players.
 
 `allow-muting="auto"` allows muting for unlimited playback and prevents it when `max-plays` is set;
-explicit `true` and `false` values override that rule. Prevention covers both the native muted state
-and volume zero for the player's entire lifetime. The browser-owned mute control remains visible
-and immediately reverts when used because native media controls do not offer a portable way to
-remove only that control. System volume, browser-tab muting, and script tampering remain outside the
-element's client-side enforcement.
+explicit `true` and `false` values override that rule. Prevention covers both the muted state and
+volume zero for the player's entire lifetime. System volume, browser-tab muting, and script
+tampering remain outside the element's client-side enforcement.
 
-Pause and seeking restrictions use browser media events. Native controls and browser behavior vary,
-so the element restores a prohibited seek or attempts to resume a prohibited pause; it cannot offer
-tamper-resistant enforcement.
+The custom controls disable Pause, Seek, Mute, or Play whenever that action is unavailable. Hovering,
+focusing, or pressing a locked control shows a short tooltip, and pressing it also writes the reason
+below the player. Media events still enforce the same restrictions if playback is manipulated by
+other browser features or scripts; these client-side controls are not tamper-resistant.
 
 ## Media selection and grading
 
@@ -187,10 +212,10 @@ def generate(data):
 <pl-string-input answers-name="direction"></pl-string-input>
 ```
 
-The demonstration course includes both patterns, multiple players, a persisted player, basic and
-limited videos, and a representative language-listening question. Every public demo keeps media in
-its own `clientFilesQuestion` directory so it remains copyable through PrairieLearn content
-sharing.
+The demonstration course includes both selection patterns, multiple players, a persisted player,
+basic and limited videos, direct external audio, a YouTube embed, and a representative
+language-listening question. Local-media demos keep their files in their own `clientFilesQuestion`
+directories so they remain copyable through PrairieLearn content sharing.
 
 ## Development
 

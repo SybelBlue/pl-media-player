@@ -1,25 +1,157 @@
 .pl-media-player {
-  margin-bottom: 1rem;
-  max-width: 100%;
+  margin: 0 auto 1rem;
+  max-width: 40rem;
+  text-align: left;
+  width: 100%;
 }
 
 .pl-media-player audio {
   display: block;
+  margin-inline: auto;
   width: min(100%, 40rem);
 }
 
 .pl-media-player video {
   display: block;
   height: auto;
+  margin-inline: auto;
   max-height: 32rem;
   max-width: 100%;
 }
 
-.pl-media-player-status:not(:empty) {
-  color: var(--bs-danger-text-emphasis, #842029);
+.pl-media-player-youtube {
+  aspect-ratio: 16 / 9;
+  display: block;
+  height: auto;
+  margin-inline: auto;
+  max-width: 100%;
+}
+
+.pl-media-player-controls {
+  align-items: center;
+  background: var(--bs-tertiary-bg, #f8f9fa);
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0.375rem;
+  display: flex;
+  gap: 0.5rem;
+  margin-inline: auto;
+  max-width: 40rem;
+  padding: 0.5rem;
+  width: 100%;
+}
+
+.pl-media-player-controls[hidden] {
+  display: none;
+}
+
+.pl-media-player-control-lock {
+  display: inline-flex;
+  position: relative;
+}
+
+.pl-media-player-seek-lock {
+  flex: 1 1 10rem;
+  min-width: 4rem;
+}
+
+.pl-media-player-play,
+.pl-media-player-mute {
+  min-width: 3.75rem;
+}
+
+.pl-media-player button:focus-visible,
+.pl-media-player input:focus-visible,
+.pl-media-player-control-lock:focus-visible {
+  outline: 0.2rem solid rgba(var(--bs-primary-rgb, 13, 110, 253), 0.35);
+  outline-offset: 0.125rem;
+}
+
+.pl-media-player button:disabled,
+.pl-media-player input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Let the wrapper receive a press so it can explain why the disabled control is locked. */
+.pl-media-player-control-lock[data-locked='true'] > button:disabled,
+.pl-media-player-control-lock[data-locked='true'] > input:disabled {
+  pointer-events: none;
+}
+
+.pl-media-player-control-lock[data-locked='true'] {
+  cursor: not-allowed;
+}
+
+.pl-media-player-seek,
+.pl-media-player-volume {
+  margin: 0;
+}
+
+.pl-media-player-seek {
+  width: 100%;
+}
+
+.pl-media-player-volume {
+  flex: 0 1 6rem;
+  min-width: 3rem;
+}
+
+.pl-media-player-time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pl-media-player-tooltip {
+  background: var(--bs-dark, #212529);
+  border-radius: 0.25rem;
+  bottom: calc(100% + 0.5rem);
+  color: var(--bs-white, #fff);
+  left: 50%;
+  max-width: min(18rem, 80vw);
+  opacity: 0;
+  padding: 0.25rem 0.5rem;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  transition:
+    opacity 0.15s ease-in-out,
+    visibility 0.15s ease-in-out;
+  visibility: hidden;
+  white-space: normal;
+  width: max-content;
+  z-index: 1;
+}
+
+.pl-media-player-control-lock[data-locked='true']:hover > .pl-media-player-tooltip,
+.pl-media-player-control-lock[data-locked='true']:focus > .pl-media-player-tooltip,
+.pl-media-player-control-lock[data-show-tooltip='true'] > .pl-media-player-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pl-media-player-play-tooltip {
+  left: 0;
+  transform: none;
+}
+
+.pl-media-player-mute-tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
 }
 
 .pl-media-player[data-exhausted='true'] audio,
 .pl-media-player[data-exhausted='true'] video {
   opacity: 0.85;
+}
+
+@media (max-width: 30rem) {
+  .pl-media-player-controls {
+    flex-wrap: wrap;
+  }
+
+  .pl-media-player-seek-lock {
+    flex-basis: calc(100% - 4.5rem);
+  }
 }

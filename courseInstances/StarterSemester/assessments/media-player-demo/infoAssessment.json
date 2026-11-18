@@ -30,6 +30,14 @@
           "points": 1
         },
         {
+          "id": "media/external-audio",
+          "points": 1
+        },
+        {
+          "id": "media/youtube",
+          "points": 1
+        },
+        {
           "id": "media/random-directory",
           "points": 1
         },
