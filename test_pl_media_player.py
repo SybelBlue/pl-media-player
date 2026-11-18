@@ -408,6 +408,40 @@ def test_video_and_controls_render_as_one_continuous_frame(data):
     assert "rounded" not in controls.classes
 
 
+def test_media_buttons_render_accessible_svg_icons(data):
+    write_media(data, "clip.wav")
+    html = '<pl-media-player file-name="clip.wav"></pl-media-player>'
+
+    prepare(html, data)
+    document = media_player.lxml.html.fragment_fromstring(render(html, data))
+    play_button = document.xpath(".//button[contains(@class, 'pl-media-player-play')]")[
+        0
+    ]
+    mute_button = document.xpath(".//button[contains(@class, 'pl-media-player-mute')]")[
+        0
+    ]
+
+    assert play_button.text_content().strip() == ""
+    assert play_button.attrib["aria-label"] == "Play"
+    assert play_button.attrib["data-icon"] == "play"
+    assert {icon.attrib["class"] for icon in play_button.xpath("./svg")} == {
+        "pl-media-player-icon pl-media-player-icon-play",
+        "pl-media-player-icon pl-media-player-icon-pause",
+    }
+
+    assert mute_button.text_content().strip() == ""
+    assert mute_button.attrib["aria-label"] == "Mute"
+    assert mute_button.attrib["data-icon"] == "volume"
+    assert {icon.attrib["class"] for icon in mute_button.xpath("./svg")} == {
+        "pl-media-player-icon pl-media-player-icon-volume",
+        "pl-media-player-icon pl-media-player-icon-muted",
+    }
+
+    for icon in play_button.xpath("./svg") + mute_button.xpath("./svg"):
+        assert icon.attrib["aria-hidden"] == "true"
+        assert icon.attrib["focusable"] == "false"
+
+
 def test_playback_count_is_restored_from_submission_and_excluded_from_answers(data):
     write_media(data, "clip.wav")
     html = (

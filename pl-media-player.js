@@ -294,10 +294,10 @@
         !inactiveAndExhausted &&
         !this.config.allowPause &&
         this.budget.remaining === 1;
-      const playMessage = inactiveAndExhausted
-        ? 'No plays left.'
-        : 'Pausing disabled.';
-      this.$playButton.text(playLabel).attr('aria-label', playLabel);
+      const playMessage = inactiveAndExhausted ? 'No plays left.' : 'Pausing disabled.';
+      this.$playButton
+        .attr('data-icon', isPlaying ? 'pause' : 'play')
+        .attr('aria-label', playLabel);
       this.$playButton.attr('data-warning', String(finalUnpausableAttempt));
       this.$playButton.toggleClass('btn-danger', finalUnpausableAttempt);
       this.$playButton.toggleClass('btn-outline-secondary', !finalUnpausableAttempt);
@@ -321,7 +321,8 @@
 
       const muted = this.media.muted || this.media.volume === 0;
       const muteLabel = muted ? 'Unmute' : 'Mute';
-      this.$muteButton.text(muteLabel).attr('aria-label', muteLabel);
+      this.$muteButton.attr('data-icon', muted ? 'muted' : 'volume').attr('aria-label', muteLabel);
+      this.$volume.attr('data-muted', String(muted));
       this.#setLockedControl(
         this.$muteLock,
         this.$muteButton,
@@ -357,9 +358,7 @@
         !this.config.allowPause &&
         this.budget.remaining === 1;
       this.$playbackWarning.prop('hidden', !finalUnpausableAttempt);
-      this.$playbackWarning.text(
-        finalUnpausableAttempt ? 'Final play; pausing disabled.' : '',
-      );
+      this.$playbackWarning.text(finalUnpausableAttempt ? 'Final play; pausing disabled.' : '');
     }
 
     #togglePlayback() {
@@ -399,7 +398,11 @@
         this.#showLockout(this.$muteLock);
         return;
       }
-      this.media.muted = !this.media.muted;
+      const unmute = this.media.muted || this.media.volume === 0;
+      if (unmute && this.media.volume === 0) {
+        this.media.volume = this.lastAudibleVolume;
+      }
+      this.media.muted = !unmute;
     }
 
     #onVolumeInput() {
@@ -411,6 +414,7 @@
         return;
       }
       this.media.volume = nextVolume;
+      this.media.muted = nextVolume === 0;
     }
 
     #denyPlayback() {
@@ -531,10 +535,7 @@
         new MediaPlayerController(container, config);
         $container.data('pl-media-player-initialized', true);
       } catch (error) {
-        $container
-          .find('.pl-media-player-status')
-          .first()
-          .text('Player failed to load.');
+        $container.find('.pl-media-player-status').first().text('Player failed to load.');
         console.error('pl-media-player initialization failed', error);
       }
     });
