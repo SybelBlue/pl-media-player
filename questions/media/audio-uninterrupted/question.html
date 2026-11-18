@@ -1,0 +1,21 @@
+<pl-question-panel>
+  <h2>One uninterrupted playback</h2>
+  <pre><code>&lt;pl-media-player
+    file-name="demo.wav"
+    max-plays="1"
+    allow-pause="false"
+    allow-seeking="false"&gt;
+&lt;/pl-media-player&gt;</code></pre>
+  <pl-media-player
+    file-name="demo.wav"
+    max-plays="1"
+    allow-pause="false"
+    allow-seeking="false"
+    player-id="uninterrupted"
+  >
+  </pl-media-player>
+  <p>
+    <strong>Expected behavior:</strong> The first start consumes the only attempt. The player tries
+    to resume immediately if paused and restores the current position if a seek is attempted.
+  </p>
+</pl-question-panel>

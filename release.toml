@@ -1,0 +1,16 @@
+version = 2
+history_source = "elements/pl-media-player"
+source_branch = "main"
+target_branch = "release"
+
+[[include]]
+source = "elements/pl-media-player"
+destination = "."
+
+[[include]]
+source = "README.md"
+destination = "README.md"
+
+[[include]]
+source = "LICENSE"
+destination = "LICENSE"

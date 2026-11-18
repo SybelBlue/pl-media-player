@@ -6,7 +6,7 @@ SHELL := /bin/sh
 UV_CACHE_DIR ?= /tmp/learnvia-uv-cache
 UV_RUN ?= uv run --active --locked
 
-LIB_TEST_PATHS := scripts/tests
+LIB_TEST_PATHS := scripts/tests elements
 
 QUESTION_PATHS ?= questions
 E2E_SEED_COUNT ?= 3
@@ -37,8 +37,9 @@ export DOCKER_JOBS_DIR
 
 .PHONY: deps deps-install venv install-hooks refresh-git-hooks clean-git-hooks
 .PHONY: vendor-update-all vendor-update-required vendor-check-upstream vendor-check-required vendor-check-prairielearn vendor-verify
+.PHONY: release-dry-run release-build release-push
 .PHONY: update-vendored check-vendored verify-vendored
-.PHONY: test test-helpers test-e2e test-e2e-sharded test-e2e-fuzz test-e2e-fuzz-diff-only test-e2e-fuzz-sharded test-content add-e2e-regression-seed
+.PHONY: test test-helpers test-js test-e2e test-e2e-sharded test-e2e-fuzz test-e2e-fuzz-diff-only test-e2e-fuzz-sharded test-content add-e2e-regression-seed
 .PHONY: validate validate-json validate-htmlmustache check-navigator typecheck
 .PHONY: format format-py format-json format-html check-format check-format-py check-format-json check-format-html
 .PHONY: check ci-dryrun ci-run ci-retry ci-watch dev docker clean clean-python clean-js clean-docker
@@ -85,16 +86,28 @@ vendor-check-prairielearn:
 vendor-verify verify-vendored:
 	@$(UV_RUN) pl-vendor check installed
 
+release-dry-run:
+	@$(UV_RUN) pl-vendor release build --dry-run
+
+release-build:
+	@$(UV_RUN) pl-vendor release build
+
+release-push:
+	@$(UV_RUN) pl-vendor release build --push
+
 
 # Run tests
 add-e2e-regression-seed:
 	@$(UV_RUN) pl-e2e-test add-seed \
 		"$(QUESTION_PATH)" "$(VARIANT_SEED)"
 
-test: test-helpers test-e2e-sharded test-e2e-fuzz-sharded
+test: test-helpers test-js test-e2e-sharded test-e2e-fuzz-sharded
 
 test-helpers:
 	@$(UV_RUN) pytest $(LIB_TEST_PATHS) $(PYTEST_ARGS)
+
+test-js:
+	@pnpm test
 
 test-e2e test-e2e-sharded: E2E_MODE = run
 test-e2e test-e2e-sharded: E2E_SUITE_ARGS = $(E2E_RUN_ARGS)

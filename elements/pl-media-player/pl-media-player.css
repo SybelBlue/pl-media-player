@@ -1,0 +1,25 @@
+.pl-media-player {
+  margin-bottom: 1rem;
+  max-width: 100%;
+}
+
+.pl-media-player audio {
+  display: block;
+  width: min(100%, 40rem);
+}
+
+.pl-media-player video {
+  display: block;
+  height: auto;
+  max-height: 32rem;
+  max-width: 100%;
+}
+
+.pl-media-player-status:not(:empty) {
+  color: var(--bs-danger-text-emphasis, #842029);
+}
+
+.pl-media-player[data-exhausted='true'] audio,
+.pl-media-player[data-exhausted='true'] video {
+  opacity: 0.85;
+}

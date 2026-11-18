@@ -1,0 +1,18 @@
+<pl-question-panel>
+  <h2>Representative listening question</h2>
+  <p>Listen to the sentence, then select the stated arrival time.</p>
+  <pl-media-player
+    file-name="arrival.wav"
+    max-plays="2"
+    allow-seeking="false"
+    persist="variant"
+    player-id="arrival-prompt"
+  >
+  </pl-media-player>
+</pl-question-panel>
+
+<pl-multiple-choice answers-name="arrival_time">
+  <pl-answer correct="false">2:30</pl-answer>
+  <pl-answer correct="true">3:30</pl-answer>
+  <pl-answer correct="false">4:30</pl-answer>
+</pl-multiple-choice>

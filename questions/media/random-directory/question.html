@@ -1,0 +1,21 @@
+<pl-question-panel>
+  <h2>Element-managed random selection</h2>
+  <pre><code>&lt;pl-media-player
+    source-directory="clips"
+    randomize="true"
+    extensions="wav"
+    max-plays="2"&gt;
+&lt;/pl-media-player&gt;</code></pre>
+  <pl-media-player
+    source-directory="clips"
+    randomize="true"
+    extensions="wav"
+    max-plays="2"
+    player-id="random-clip"
+  >
+  </pl-media-player>
+  <p>
+    <strong>Expected behavior:</strong> <code>prepare()</code> chooses one direct child of
+    <code>clientFilesQuestion/clips</code>. The saved variant keeps that selection on every render.
+  </p>
+</pl-question-panel>

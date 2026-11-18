@@ -1,0 +1,52 @@
+{
+  "uuid": "c69ae9c1-d094-499d-9ab8-fca516e05371",
+  "type": "Exam",
+  "title": "PL Media Player Demonstrations",
+  "set": "Quiz",
+  "module": "Media Player",
+  "allowAccess": [],
+  "number": "1",
+  "zones": [
+    {
+      "questions": [
+        {
+          "id": "media/audio-basic",
+          "points": 1
+        },
+        {
+          "id": "media/audio-limited",
+          "points": 1
+        },
+        {
+          "id": "media/audio-uninterrupted",
+          "points": 1
+        },
+        {
+          "id": "media/video-limited",
+          "points": 1
+        },
+        {
+          "id": "media/random-directory",
+          "points": 1
+        },
+        {
+          "id": "media/variant-dependent",
+          "points": 1
+        },
+        {
+          "id": "media/multiple-players",
+          "points": 1
+        },
+        {
+          "id": "media/persistence",
+          "points": 1
+        },
+        {
+          "id": "media/language-listening",
+          "points": 1
+        }
+      ]
+    }
+  ],
+  "shareSourcePublicly": true
+}

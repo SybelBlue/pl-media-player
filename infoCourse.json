@@ -11,16 +11,16 @@
   ],
   "topics": [
     {
-      "name": "Starter",
-      "color": "gray1",
-      "description": "Starter content"
+      "name": "Media Player",
+      "color": "blue3",
+      "description": "Demonstrations of the pl-media-player custom element"
     }
   ],
   "tags": [
     {
-      "name": "Easy",
+      "name": "Demo",
       "color": "green1",
-      "description": "Introductory difficulty"
+      "description": "Instructor-facing demonstration"
     }
   ],
   "timezone": "America/Chicago"

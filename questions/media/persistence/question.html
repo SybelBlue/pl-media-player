@@ -1,0 +1,20 @@
+<pl-question-panel>
+  <h2>Variant-scoped browser persistence</h2>
+  <pre><code>&lt;pl-media-player
+    file-name="demo.wav"
+    max-plays="2"
+    persist="variant"
+    player-id="persistent-prompt"&gt;
+&lt;/pl-media-player&gt;</code></pre>
+  <pl-media-player
+    file-name="demo.wav"
+    max-plays="2"
+    persist="variant"
+    player-id="persistent-prompt"
+  >
+  </pl-media-player>
+  <p>
+    <strong>Try it:</strong> Start playback, then reload. The consumed attempt remains consumed. A
+    different PrairieLearn variant gets a separate local-storage key.
+  </p>
+</pl-question-panel>

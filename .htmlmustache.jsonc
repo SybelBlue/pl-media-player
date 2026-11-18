@@ -1914,6 +1914,45 @@
       ]
     },
     {
+      "name": "pl-media-player",
+      "display": "block",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-06/schema#",
+        "type": "object",
+        "properties": {
+          "allow-pause": {
+            "format": "boolean"
+          },
+          "allow-seeking": {
+            "format": "boolean"
+          },
+          "directory": {
+            "enum": ["clientFilesQuestion", "clientFilesCourse"]
+          },
+          "extensions": {},
+          "file-name": {},
+          "max-plays": {
+            "format": "integer"
+          },
+          "media-type": {
+            "enum": ["auto", "audio", "video"]
+          },
+          "persist": {
+            "enum": ["none", "variant"]
+          },
+          "player-id": {},
+          "randomize": {
+            "format": "boolean"
+          },
+          "show-remaining": {
+            "format": "boolean"
+          },
+          "source-directory": {}
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "clickable-image"
     },
     {

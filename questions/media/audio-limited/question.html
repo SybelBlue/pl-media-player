@@ -1,0 +1,21 @@
+<pl-question-panel>
+  <h2>Audio limited to two plays</h2>
+  <pre><code>&lt;pl-media-player
+    file-name="demo.wav"
+    max-plays="2"
+    allow-pause="true"
+    allow-seeking="false"&gt;
+&lt;/pl-media-player&gt;</code></pre>
+  <pl-media-player
+    file-name="demo.wav"
+    max-plays="2"
+    allow-pause="true"
+    allow-seeking="false"
+    player-id="two-plays"
+  >
+  </pl-media-player>
+  <p>
+    <strong>Expected behavior:</strong> Starting consumes one attempt. Pausing and resuming stays
+    within that attempt; replaying after the clip ends consumes the second.
+  </p>
+</pl-question-panel>
