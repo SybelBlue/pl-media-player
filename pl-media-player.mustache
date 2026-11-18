@@ -6,7 +6,7 @@
 >
   {{#youtube}}
     <iframe
-      class="pl-media-player-youtube d-block h-auto mx-auto mw-100"
+      class="pl-media-player-youtube d-block h-auto mx-auto w-100"
       width="560"
       height="315"
       src="{{src}}"
@@ -38,7 +38,7 @@
     {{/audio}}
     {{#video}}
       <video
-        class="d-block h-auto mx-auto mw-100"
+        class="d-block h-auto mx-auto w-100 border rounded-top"
         controls
         controlslist="nodownload"
         preload="metadata"
@@ -48,7 +48,12 @@
         cannot play this video file.
       </video>
     {{/video}}
-    <div class="pl-media-player-controls" role="group" aria-label="Media controls" hidden>
+    <div
+      class="pl-media-player-controls{{#video}} border-top-0 rounded-bottom{{/video}}{{^video}} rounded{{/video}}"
+      role="group"
+      aria-label="Media controls"
+      hidden
+    >
       <span
         class="pl-media-player-control-lock pl-media-player-play-lock"
         role="group"
