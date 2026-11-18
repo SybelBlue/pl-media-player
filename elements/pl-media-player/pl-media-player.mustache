@@ -64,8 +64,25 @@
           type="button"
           aria-label="Play"
           aria-describedby="pl-media-player-status-{{dom_id}}"
+          data-icon="play"
         >
-          Play
+          <svg
+            class="pl-media-player-icon pl-media-player-icon-play"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M5 3.5 12.5 8 5 12.5Z"></path>
+          </svg>
+          <svg
+            class="pl-media-player-icon pl-media-player-icon-pause"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="4" y="3" width="3" height="10" rx="0.5"></rect>
+            <rect x="9" y="3" width="3" height="10" rx="0.5"></rect>
+          </svg>
         </button>
         <span
           class="pl-media-player-tooltip pl-media-player-play-tooltip bg-dark text-white rounded px-2 py-1 small shadow-sm"
@@ -103,8 +120,28 @@
           class="pl-media-player-mute btn btn-outline-secondary btn-sm"
           type="button"
           aria-label="Mute"
+          data-icon="volume"
         >
-          Mute
+          <svg
+            class="pl-media-player-icon pl-media-player-icon-volume"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M2.5 6h2L8 3v10l-3.5-3h-2Z"></path>
+            <path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"></path>
+            <path d="M12.5 3.5a6 6 0 0 1 0 9"></path>
+          </svg>
+          <svg
+            class="pl-media-player-icon pl-media-player-icon-muted"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M2.5 6h2L8 3v10l-3.5-3h-2Z"></path>
+            <path d="m10.5 6 3.5 4"></path>
+            <path d="m14 6-3.5 4"></path>
+          </svg>
         </button>
         <span
           class="pl-media-player-tooltip pl-media-player-mute-tooltip bg-dark text-white rounded px-2 py-1 small shadow-sm"

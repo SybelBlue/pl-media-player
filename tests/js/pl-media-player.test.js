@@ -97,10 +97,7 @@ class FakeContainer extends FakeElement {
     this.playbackCount.value = '0';
     this.playbackWarning = new FakeElement();
     this.playbackWarning.hidden = true;
-    this.playbackWarning.setAttribute(
-      'class',
-      'pl-media-player-playback-warning text-danger',
-    );
+    this.playbackWarning.setAttribute('class', 'pl-media-player-playback-warning text-danger');
     this.remaining = new FakeElement();
     this.status = new FakeElement();
     this.setAttribute('data-pl-media-player-config', JSON.stringify(config));
@@ -364,12 +361,14 @@ test('a prohibited pause disables the button and explains the lockout when press
   assert.equal(player.media.controls, false);
   assert.equal(player.controls.hidden, false);
   assert.equal(player.playButton.disabled, false);
-  assert.equal(player.playButton.textContent, 'Play');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'play');
+  assert.equal(player.playButton.getAttribute('aria-label'), 'Play');
 
   player.media.emit('playing');
 
   assert.equal(player.playButton.disabled, true);
-  assert.equal(player.playButton.textContent, 'Pause');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'pause');
+  assert.equal(player.playButton.getAttribute('aria-label'), 'Pause');
   assert.equal(player.playLock.getAttribute('data-locked'), 'true');
   assert.equal(player.playLock.getAttribute('tabindex'), '0');
   assert.equal(player.playTooltip.textContent, 'Pausing disabled.');
@@ -386,7 +385,7 @@ test('a final unpausable attempt is red and warned about before playback', () =>
   loadPlayers([player]);
 
   assert.equal(player.playButton.disabled, false);
-  assert.equal(player.playButton.textContent, 'Play');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'play');
   assert.equal(player.playButton.getAttribute('data-warning'), 'true');
   assert.match(player.playButton.getAttribute('class'), /\bbtn-danger\b/);
   assert.doesNotMatch(player.playButton.getAttribute('class'), /\bbtn-outline-secondary\b/);
@@ -441,10 +440,55 @@ test('enabled custom controls play, pause, seek, mute, and adjust volume', () =>
 
   player.muteButton.emit('click');
   assert.equal(player.media.muted, true);
+  player.media.emit('volumechange');
+  assert.equal(player.muteButton.getAttribute('data-icon'), 'muted');
+  assert.equal(player.muteButton.getAttribute('aria-label'), 'Unmute');
+  assert.equal(player.volume.getAttribute('data-muted'), 'true');
+  assert.equal(player.volume.disabled, false);
+  player.muteButton.emit('click');
+  player.media.emit('volumechange');
+  assert.equal(player.media.muted, false);
+  assert.equal(player.muteButton.getAttribute('data-icon'), 'volume');
+  assert.equal(player.muteButton.getAttribute('aria-label'), 'Mute');
+  assert.equal(player.volume.getAttribute('data-muted'), 'false');
+
+  player.volume.value = '0';
+  player.volume.emit('input');
+  player.media.emit('volumechange');
+  assert.equal(player.media.volume, 0);
+  assert.equal(player.media.muted, true);
+  assert.equal(player.muteButton.getAttribute('data-icon'), 'muted');
+  assert.equal(player.muteButton.getAttribute('aria-label'), 'Unmute');
+  assert.equal(player.volume.getAttribute('data-muted'), 'true');
 
   player.volume.value = '0.3';
   player.volume.emit('input');
+  player.media.emit('volumechange');
   assert.equal(player.media.volume, 0.3);
+  assert.equal(player.media.muted, false);
+  assert.equal(player.muteButton.getAttribute('data-icon'), 'volume');
+  assert.equal(player.muteButton.getAttribute('aria-label'), 'Mute');
+  assert.equal(player.volume.getAttribute('data-muted'), 'false');
+});
+
+test('unmuting at zero restores the last audible volume', () => {
+  const player = container();
+  loadPlayers([player]);
+
+  player.volume.value = '0.4';
+  player.volume.emit('input');
+  player.media.emit('volumechange');
+  player.volume.value = '0';
+  player.volume.emit('input');
+  player.media.emit('volumechange');
+
+  player.muteButton.emit('click');
+  player.media.emit('volumechange');
+
+  assert.equal(player.media.volume, 0.4);
+  assert.equal(player.media.muted, false);
+  assert.equal(player.muteButton.getAttribute('data-icon'), 'volume');
+  assert.equal(player.volume.getAttribute('data-muted'), 'false');
 });
 
 test('locked controls expose warnings to pointer and keyboard users', () => {
@@ -472,7 +516,7 @@ test('play is disabled with a warning once all attempts are exhausted', () => {
   player.media.emit('ended');
 
   assert.equal(player.playButton.disabled, true);
-  assert.equal(player.playButton.textContent, 'Play');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'play');
   assert.equal(player.playTooltip.textContent, 'No plays left.');
 
   player.playLock.emit('click');
