@@ -48,55 +48,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pl-media-player"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "chevron" },
-    { name = "numpy" },
-    { name = "sympy" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ipython" },
-    { name = "jsonschema" },
-    { name = "lxml" },
-    { name = "pl-e2e-test" },
-    { name = "pl-vendor" },
-    { name = "prairielearn" },
-    { name = "pyfakefs" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "rich" },
-    { name = "ruff" },
-    { name = "sketchresponse" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "chevron", specifier = "==0.14.0" },
-    { name = "numpy" },
-    { name = "sympy", specifier = "==1.14.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "ipython" },
-    { name = "jsonschema" },
-    { name = "lxml", specifier = ">=6.1.0" },
-    { name = "pl-e2e-test", specifier = ">=0.1.5" },
-    { name = "pl-vendor", specifier = ">=0.6.2" },
-    { name = "prairielearn", git = "https://github.com/PrairieLearn/PrairieLearn.git?subdirectory=apps%2Fprairielearn%2Fpython" },
-    { name = "pyfakefs" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "rich" },
-    { name = "ruff" },
-    { name = "sketchresponse" },
-]
-
-[[package]]
 name = "cyclopts"
 version = "5.3.3"
 source = { registry = "https://pypi.org/simple" }
@@ -511,10 +462,11 @@ wheels = [
 
 [[package]]
 name = "pl-e2e-test"
-version = "0.1.5"
+version = "0.2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chevron" },
+    { name = "cyclopts" },
     { name = "filelock" },
     { name = "jsonschema" },
     { name = "lxml" },
@@ -525,15 +477,65 @@ dependencies = [
     { name = "pytest" },
     { name = "rich" },
     { name = "ruff" },
+    { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/99/615e28311b44834981bbefe4627da7cbeb7a65a3285f722fd961feb7cfee/pl_e2e_test-0.1.5.tar.gz", hash = "sha256:3f39b0b737f17c37f038c286e5208e68d06c72e08b5ce0a741095032d7d122e7", size = 66791, upload-time = "2026-09-29T00:35:02.392Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/fd/f49a821248278d1c6d857fd97d81d5f23f1d72b9fa1e4cc5a358e1b6565d/pl_e2e_test-0.2.4.tar.gz", hash = "sha256:235b80a257847fcc7690de6c6664ad29e43693923ab1d392559142fff1a46ba6", size = 124294, upload-time = "2026-11-17T20:20:33.351Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/03/72a79e87d14efaf4755be95fb025b29384f7ac0fd02f84ab88874e3d14a7/pl_e2e_test-0.1.5-py3-none-any.whl", hash = "sha256:b1b766ef03c084c6cdd9f49f1632c447012792edb2718946b22c481990f34d8c", size = 53651, upload-time = "2026-09-29T00:35:00.868Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/fc/203b88bed81c61b8a43c53962b3b974825e659dd912cf3e804bdf512a79b/pl_e2e_test-0.2.4-py3-none-any.whl", hash = "sha256:09dc5c0befc15db36e525332174406d25026debb6eeb30e7fdf6c1d3619c4204", size = 82041, upload-time = "2026-11-17T20:20:31.877Z" },
+]
+
+[[package]]
+name = "pl-media-player"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "chevron" },
+    { name = "numpy" },
+    { name = "sympy" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ipython" },
+    { name = "jsonschema" },
+    { name = "lxml" },
+    { name = "pl-e2e-test" },
+    { name = "pl-vendor" },
+    { name = "prairielearn" },
+    { name = "pyfakefs" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "rich" },
+    { name = "ruff" },
+    { name = "sketchresponse" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "chevron", specifier = "==0.14.0" },
+    { name = "numpy" },
+    { name = "sympy", specifier = "==1.14.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipython" },
+    { name = "jsonschema" },
+    { name = "lxml", specifier = ">=6.1.0" },
+    { name = "pl-e2e-test", specifier = ">=0.2.4" },
+    { name = "pl-vendor", specifier = ">=0.7.0" },
+    { name = "prairielearn", git = "https://github.com/PrairieLearn/PrairieLearn.git?subdirectory=apps%2Fprairielearn%2Fpython" },
+    { name = "pyfakefs" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "rich" },
+    { name = "ruff" },
+    { name = "sketchresponse" },
 ]
 
 [[package]]
 name = "pl-vendor"
-version = "0.6.4"
+version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cyclopts" },
@@ -542,9 +544,9 @@ dependencies = [
     { name = "rich" },
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/07/89117ec4f322470b7f17c0cbf26e217640b1050c0af9bf331139b92f6211/pl_vendor-0.6.4.tar.gz", hash = "sha256:b6905c5a5f7ddf83a12cb3e024d4e186d82daa82f7dc77abd80cc39371033664", size = 185367, upload-time = "2026-11-05T07:08:39.46Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/d9/caac8c1119e7942f99b602827c17c202b93be70b7e6ecc8735b8e9f6bcc9/pl_vendor-0.7.1.tar.gz", hash = "sha256:8ac2ec60b2e1f36b335754014dc503d7661d15b5c963abc601f7e3f5f21e53e5", size = 207516, upload-time = "2026-11-12T17:24:53.305Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/99/81295061194449d20015724a842becc09e4e8924bd8092c8ab3724844b9f/pl_vendor-0.6.4-py3-none-any.whl", hash = "sha256:b9a1706d3c6867d437c56040fec372c790b3222ab686e9b955d6f27e4f70f2ed", size = 98201, upload-time = "2026-11-05T07:08:38.113Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/b3/bf020890a1c80da0dbddcfbb32d72bd4c6dbc3e4273fdb33f9ffcf26a140/pl_vendor-0.7.1-py3-none-any.whl", hash = "sha256:cf56f1852a3c824b78a41b568ef82c6176f42563c78b2503835d4f5cb553354e", size = 107628, upload-time = "2026-11-12T17:24:51.962Z" },
 ]
 
 [[package]]
@@ -913,11 +915,11 @@ wheels = [
 
 [[package]]
 name = "tomlkit"
-version = "0.15.1"
+version = "0.15.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/94/96/e07752635b98536177fa1f37671c8f3cdde2e724c6bcf6034b2cfb571565/tomlkit-0.15.1.tar.gz", hash = "sha256:e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97", size = 180129, upload-time = "2026-07-17T01:48:04.562Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/72/fc01563df95c189a9f65850096bdc205bc2fe37da6c740cd64afaf18d07e/tomlkit-0.15.2.tar.gz", hash = "sha256:83e32755ba1d20d9340bd069ee97e9f6232ba2346b63ffcba425de01f7e327a6", size = 190522, upload-time = "2026-10-16T04:07:08.166Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/bc/8c13eb66537dce1d2bd3a57132902f38d0e7f5bb46fa9f4daed9fe9d76ee/tomlkit-0.15.1-py3-none-any.whl", hash = "sha256:177a05aece5a8ca5266fd3c448abb47b8d352f09d477d3ca8332db4d89b24304", size = 49449, upload-time = "2026-07-17T01:48:05.728Z" },
+    { url = "https://files.pythonhosted.org/packages/da/46/7d84138a60a8bd796825b2d38ebe92d0d16501ca57d501b7c5d677401bbc/tomlkit-0.15.2-py3-none-any.whl", hash = "sha256:05562412163a3037b94497385fb7f9204c637bc605af7a48199e41cf2272f437", size = 52225, upload-time = "2026-10-16T04:07:09.216Z" },
 ]
 
 [[package]]

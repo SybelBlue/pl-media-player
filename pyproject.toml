@@ -6,20 +6,16 @@ build-backend = "setuptools.build_meta"
 name = "pl-media-player"
 version = "0.1.0"
 requires-python = ">=3.13"
-dependencies = [
-  "numpy",
-  "sympy==1.14.0",
-  "chevron==0.14.0",
-]
+dependencies = ["numpy", "sympy==1.14.0", "chevron==0.14.0"]
 
 [dependency-groups]
 dev = [
   "ipython",
   "jsonschema",
-  "pl-vendor>=0.6.2",
+  "pl-vendor>=0.7.0",
   "pyright",
   "ruff",
-  "pl-e2e-test>=0.1.5",
+  "pl-e2e-test>=0.2.4",
   "lxml>=6.1.0",
   "pytest",
   "rich",
