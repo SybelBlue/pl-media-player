@@ -110,8 +110,8 @@ test-e2e test-e2e-fuzz-diff-only:
 			git rev-parse --verify --quiet "$(E2E_DIFF_HEAD)^{commit}" >/dev/null; }; then \
 		echo "E2E diff refs $(E2E_DIFF_BASE)..$(E2E_DIFF_HEAD) are unavailable; skipping diff-only tests."; \
 	else \
-		$(UV_RUN) pl-e2e-test $(filter diff,$(E2E_MODE)) \
-			$(E2E_SUITE_ARGS) $(E2E_COMMON_ARGS) $(E2E_SHARD_ARGS) $(PYTEST_ARGS); \
+		$(UV_RUN) pl-e2e-test $(E2E_MODE) \
+			$(E2E_SUITE_ARGS) $(E2E_COMMON_ARGS) $(E2E_SHARD_ARGS) -- $(PYTEST_ARGS); \
 	fi
 
 # The parallel wrapper assigns shards and reports itself.
@@ -124,8 +124,8 @@ test-e2e-sharded test-e2e-fuzz-sharded:
 			git rev-parse --verify --quiet "$(E2E_DIFF_HEAD)^{commit}" >/dev/null; }; then \
 		echo "E2E diff refs $(E2E_DIFF_BASE)..$(E2E_DIFF_HEAD) are unavailable; skipping diff-only tests."; \
 	else \
-		$(UV_RUN) pl-e2e-test parallel --shard-count "$(E2E_SHARD_COUNT)" \
-			$(E2E_MODE) -- $(E2E_SUITE_ARGS) $(E2E_COMMON_ARGS) $(PYTEST_ARGS); \
+		$(UV_RUN) pl-e2e-test parallel $(E2E_MODE) --shard-count "$(E2E_SHARD_COUNT)" \
+			$(E2E_SUITE_ARGS) $(E2E_COMMON_ARGS) -- $(PYTEST_ARGS); \
 	fi
 
 test-e2e-fuzz: test-e2e-fuzz-diff-only
