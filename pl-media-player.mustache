@@ -1,0 +1,26 @@
+<div
+  class="pl-media-player"
+  id="pl-media-player-{{dom_id}}"
+  data-pl-media-player-config="{{config_json}}"
+>
+  {{#audio}}
+    <audio controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
+      <source src="{{src}}" type="{{mime_type}}" /> Your browser cannot play this audio file.
+    </audio>
+  {{/audio}}
+  {{#video}}
+    <video controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
+      <source src="{{src}}" type="{{mime_type}}" /> Your browser cannot play this video file.
+    </video>
+  {{/video}}
+  {{#show_remaining}}
+    <p class="pl-media-player-remaining small text-muted mb-1" aria-live="polite">
+    </p>
+  {{/show_remaining}}
+  <p
+    class="pl-media-player-status small mb-0"
+    id="pl-media-player-status-{{dom_id}}"
+    aria-live="polite"
+  >
+  </p>
+</div>

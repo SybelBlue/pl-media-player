@@ -1,0 +1,11 @@
+{
+  "controller": "pl-media-player.py",
+  "dependencies": {
+    "elementScripts": [
+      "pl-media-player.js"
+    ],
+    "elementStyles": [
+      "pl-media-player.css"
+    ]
+  }
+}
