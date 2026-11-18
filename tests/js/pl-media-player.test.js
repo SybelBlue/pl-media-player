@@ -60,10 +60,12 @@ class FakeMedia extends FakeElement {
 
   pause() {
     this.pauseCalls += 1;
+    this.paused = true;
   }
 
   play() {
     this.playCalls += 1;
+    this.paused = false;
     return Promise.resolve();
   }
 
@@ -95,6 +97,7 @@ class FakeContainer extends FakeElement {
     this.volume = new FakeElement();
     this.playbackCount = new FakeElement();
     this.playbackCount.value = '0';
+    this.playbackCount.setAttribute('data-skip-unload-check', 'true');
     this.playbackWarning = new FakeElement();
     this.playbackWarning.hidden = true;
     this.playbackWarning.setAttribute('class', 'pl-media-player-playback-warning text-danger');
@@ -270,6 +273,7 @@ function createJQuery(containers) {
 function config(overrides = {}) {
   return {
     allowMuting: true,
+    allowOverlappingPlayback: false,
     allowPause: true,
     allowSeeking: true,
     maxPlays: 2,
@@ -326,6 +330,90 @@ test('initial playback consumes one attempt and pause/resume does not consume an
   player.media.emit('pause');
   player.media.emit('playing');
   assert.equal(player.remaining.textContent, '1 play left.');
+});
+
+test('an active limited playback marks the question dirty until the session ends', () => {
+  const player = container();
+  loadPlayers([player]);
+
+  assert.equal(player.playbackCount.getAttribute('data-skip-unload-check'), 'true');
+
+  player.media.emit('playing');
+  assert.equal(player.playbackCount.getAttribute('data-skip-unload-check'), null);
+
+  player.media.emit('pause');
+  assert.equal(player.playbackCount.getAttribute('data-skip-unload-check'), null);
+
+  player.media.ended = true;
+  player.media.emit('ended');
+  assert.equal(player.playbackCount.getAttribute('data-skip-unload-check'), 'true');
+});
+
+test('unlimited playback remains excluded from the unload dirty check', () => {
+  const player = container({ maxPlays: null });
+  loadPlayers([player]);
+
+  player.media.emit('playing');
+
+  assert.equal(player.playbackCount.getAttribute('data-skip-unload-check'), 'true');
+});
+
+test('starting a player pauses other interruptible players by default', () => {
+  const first = container({ playerId: 'first' });
+  const second = container({ playerId: 'second' });
+  loadPlayers([first, second]);
+
+  first.media.emit('playing');
+  second.playButton.emit('click');
+
+  assert.equal(first.media.pauseCalls, 1);
+  assert.equal(second.media.playCalls, 1);
+});
+
+test('an uninterruptible player prevents conflicting playback', () => {
+  const first = container({ allowPause: false, playerId: 'first' });
+  const second = container({ allowOverlappingPlayback: true, playerId: 'second' });
+  loadPlayers([first, second]);
+
+  first.media.emit('playing');
+  second.playButton.emit('click');
+
+  assert.equal(first.media.pauseCalls, 0);
+  assert.equal(second.media.playCalls, 0);
+  assert.equal(
+    second.status.textContent,
+    'Another media player is playing and cannot be interrupted.',
+  );
+});
+
+test('a conflicting native play event is stopped before using an attempt', () => {
+  const first = container({ allowPause: false, playerId: 'first' });
+  const second = container({ playerId: 'second' });
+  loadPlayers([first, second]);
+
+  first.media.emit('playing');
+  second.media.emit('play');
+
+  assert.equal(first.media.pauseCalls, 0);
+  assert.equal(second.media.pauseCalls, 1);
+  assert.equal(second.media.paused, true);
+  assert.equal(second.playbackCount.value, '0');
+  assert.equal(
+    second.status.textContent,
+    'Another media player is playing and cannot be interrupted.',
+  );
+});
+
+test('players overlap only when both opt in', () => {
+  const first = container({ allowOverlappingPlayback: true, playerId: 'first' });
+  const second = container({ allowOverlappingPlayback: true, playerId: 'second' });
+  loadPlayers([first, second]);
+
+  first.media.emit('playing');
+  second.playButton.emit('click');
+
+  assert.equal(first.media.pauseCalls, 0);
+  assert.equal(second.media.playCalls, 1);
 });
 
 test('replay consumes another attempt and replay after exhaustion is denied', () => {

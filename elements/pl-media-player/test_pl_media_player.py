@@ -45,33 +45,34 @@ def write_media(data, relative: str, *, course: bool = False) -> Path:
     return path
 
 
-def prepare(html: str, data, index: int = 0) -> None:
-    media_player._prepare_with_index(html, data, index)
+def prepare(html: str, data) -> None:
+    media_player.prepare(html, data)
 
 
-def render(html: str, data, index: int = 0) -> str:
-    return media_player._render_with_index(html, data, index)
+def render(html: str, data) -> str:
+    return media_player.render(html, data)
 
 
-def parse(html: str, data, index: int = 0) -> None:
-    media_player._parse_with_index(html, data, index)
+def parse(html: str, data) -> None:
+    media_player.parse(html, data)
 
 
 def test_config_is_frozen_portable_and_validated():
     element = media_player._element(
         '<pl-media-player file-name="clip.wav" max-plays="2" '
-        'persist="variant"></pl-media-player>'
+        'persist="variant" player-id="main"></pl-media-player>'
     )
 
-    config = media_player.Config.from_element(element, 0)
+    config = media_player.Config.from_element(element)
 
     assert config.to_client_dict("variant-1") == {
         "allowMuting": False,
+        "allowOverlappingPlayback": False,
         "allowPause": True,
         "allowSeeking": True,
         "maxPlays": 2,
         "persist": True,
-        "playerId": "auto-1",
+        "playerId": "main",
         "showRemaining": True,
         "variantId": "variant-1",
     }
@@ -81,13 +82,13 @@ def test_config_is_frozen_portable_and_validated():
 
 def test_explicit_question_file_is_resolved_and_rendered(data):
     write_media(data, "clips/hello.wav")
-    html = '<pl-media-player file-name="clips/hello.wav"></pl-media-player>'
+    html = '<pl-media-player file-name="clips/hello.wav" player-id="hello"></pl-media-player>'
 
     prepare(html, data)
     output = render(html, data)
 
     assert (
-        data["params"][media_player.PARAMS_KEY]["auto-1"]["file_name"]
+        data["params"][media_player.PARAMS_KEY]["hello"]["file_name"]
         == "clips/hello.wav"
     )
     assert 'src="/q/7/clientFilesQuestion/clips/hello.wav"' in output
@@ -98,7 +99,8 @@ def test_explicit_question_file_is_resolved_and_rendered(data):
 
 def test_external_url_is_preserved_and_rendered(data):
     html = (
-        '<pl-media-player url="https://cdn.example.test/media/clip.mp3?token=a%20b&amp;v=2">'
+        '<pl-media-player url="https://cdn.example.test/media/clip.mp3?token=a%20b&amp;v=2" '
+        'player-id="external">'
         "</pl-media-player>"
     )
 
@@ -107,7 +109,7 @@ def test_external_url_is_preserved_and_rendered(data):
     document = media_player.lxml.html.fragment_fromstring(output)
     source = document.xpath(".//source")[0]
 
-    assert data["params"][media_player.PARAMS_KEY]["auto-1"] == {
+    assert data["params"][media_player.PARAMS_KEY]["external"] == {
         "media_type": "audio",
         "url": "https://cdn.example.test/media/clip.mp3?token=a%20b&v=2",
     }
@@ -121,7 +123,7 @@ def test_external_url_is_preserved_and_rendered(data):
 def test_extensionless_external_url_uses_explicit_media_type(data):
     html = (
         '<pl-media-player url="https://media.example.test/playback?id=example" '
-        'media-type="video"></pl-media-player>'
+        'media-type="video" player-id="stream"></pl-media-player>'
     )
 
     prepare(html, data)
@@ -144,14 +146,14 @@ def test_extensionless_external_url_uses_explicit_media_type(data):
     ],
 )
 def test_youtube_urls_render_as_embed_iframes(data, url):
-    html = f'<pl-media-player url="{url}"></pl-media-player>'
+    html = f'<pl-media-player url="{url}" player-id="youtube"></pl-media-player>'
 
     prepare(html, data)
     output = render(html, data)
     document = media_player.lxml.html.fragment_fromstring(output)
     iframe = document.xpath(".//iframe")[0]
 
-    assert data["params"][media_player.PARAMS_KEY]["auto-1"] == {
+    assert data["params"][media_player.PARAMS_KEY]["youtube"] == {
         "youtube_embed_url": "https://www.youtube.com/embed/VIDEO_ID"
     }
     assert iframe.attrib == {
@@ -176,11 +178,11 @@ def test_directory_discovery_filters_extensions_and_persists_selection(data):
     write_media(data, "clips/ignore.mp4")
     html = (
         '<pl-media-player source-directory="clips" randomize="true" '
-        'media-type="audio" extensions="wav, mp3"></pl-media-player>'
+        'media-type="audio" extensions="wav, mp3" player-id="discovery"></pl-media-player>'
     )
 
     prepare(html, data)
-    selected = data["params"][media_player.PARAMS_KEY]["auto-1"]["file_name"]
+    selected = data["params"][media_player.PARAMS_KEY]["discovery"]["file_name"]
     write_media(data, "clips/new.wav")
     output = render(html, data)
 
@@ -192,14 +194,15 @@ def test_random_selection_changes_with_variant_seed(data):
     for index in range(10):
         write_media(data, f"clips/{index}.wav")
     html = (
-        '<pl-media-player source-directory="clips" randomize="true"></pl-media-player>'
+        '<pl-media-player source-directory="clips" randomize="true" '
+        'player-id="random"></pl-media-player>'
     )
 
     selected = set()
     for seed in range(20):
         variant = {**data, "params": {}, "variant_seed": seed}
         prepare(html, variant)
-        selected.add(variant["params"][media_player.PARAMS_KEY]["auto-1"]["file_name"])
+        selected.add(variant["params"][media_player.PARAMS_KEY]["random"]["file_name"])
 
     assert len(selected) > 1
 
@@ -207,16 +210,21 @@ def test_random_selection_changes_with_variant_seed(data):
 def test_multiple_instances_have_independent_selections_and_ids(data):
     for index in range(8):
         write_media(data, f"clips/{index}.wav")
-    html = (
-        '<pl-media-player source-directory="clips" randomize="true"></pl-media-player>'
+    first_html = (
+        '<pl-media-player source-directory="clips" randomize="true" '
+        'player-id="first"></pl-media-player>'
+    )
+    second_html = (
+        '<pl-media-player source-directory="clips" randomize="true" '
+        'player-id="second"></pl-media-player>'
     )
 
-    prepare(html, data, 0)
-    prepare(html, data, 1)
+    prepare(first_html, data)
+    prepare(second_html, data)
 
     state = data["params"][media_player.PARAMS_KEY]
-    assert set(state) == {"auto-1", "auto-2"}
-    assert state["auto-1"]["file_name"] != state["auto-2"]["file_name"]
+    assert set(state) == {"first", "second"}
+    assert state["first"]["file_name"] != state["second"]["file_name"]
 
 
 def test_empty_or_missing_discovery_directory_has_clear_error(data):
@@ -224,24 +232,29 @@ def test_empty_or_missing_discovery_directory_has_clear_error(data):
 
     with pytest.raises(ValueError, match="No supported media files"):
         prepare(
-            '<pl-media-player source-directory="empty" randomize="true"></pl-media-player>',
+            '<pl-media-player source-directory="empty" randomize="true" '
+            'player-id="empty"></pl-media-player>',
             data,
         )
     with pytest.raises(FileNotFoundError, match="Directory .* not found"):
         prepare(
-            '<pl-media-player source-directory="missing" randomize="true"></pl-media-player>',
+            '<pl-media-player source-directory="missing" randomize="true" '
+            'player-id="missing"></pl-media-player>',
             {**data, "params": {}},
         )
 
 
 def test_missing_file_and_path_traversal_are_rejected(data):
     with pytest.raises(FileNotFoundError, match="not found"):
-        prepare('<pl-media-player file-name="missing.wav"></pl-media-player>', data)
+        prepare(
+            '<pl-media-player file-name="missing.wav" player-id="missing"></pl-media-player>',
+            data,
+        )
 
     for path in ("../secret.wav", "/absolute.wav", "nested/../../secret.wav"):
         with pytest.raises(ValueError, match="stay inside"):
             prepare(
-                f'<pl-media-player file-name="{path}"></pl-media-player>',
+                f'<pl-media-player file-name="{path}" player-id="path"></pl-media-player>',
                 {**data, "params": {}},
             )
 
@@ -255,7 +268,8 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
 
     with pytest.raises(ValueError, match="resolves outside"):
         prepare(
-            '<pl-media-player source-directory="clips" randomize="true"></pl-media-player>',
+            '<pl-media-player source-directory="clips" randomize="true" '
+            'player-id="escape"></pl-media-player>',
             data,
         )
 
@@ -263,17 +277,27 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
 @pytest.mark.parametrize(
     ("html", "message"),
     [
-        ("<pl-media-player></pl-media-player>", "Provide file-name"),
         (
-            '<pl-media-player file-name="clip.wav" randomize="true"></pl-media-player>',
-            "cannot be combined",
+            '<pl-media-player file-name="clip.wav"></pl-media-player>',
+            "player-id",
         ),
         (
-            '<pl-media-player source-directory="clips" randomize="false"></pl-media-player>',
+            '<pl-media-player player-id="main"></pl-media-player>',
             "Provide file-name",
         ),
         (
-            '<pl-media-player file-name="clip.wav" max-plays="0"></pl-media-player>',
+            '<pl-media-player file-name="clip.wav" randomize="true" '
+            'player-id="main"></pl-media-player>',
+            "cannot be combined",
+        ),
+        (
+            '<pl-media-player source-directory="clips" randomize="false" '
+            'player-id="main"></pl-media-player>',
+            "Provide file-name",
+        ),
+        (
+            '<pl-media-player file-name="clip.wav" max-plays="0" '
+            'player-id="main"></pl-media-player>',
             "at least 1",
         ),
         (
@@ -281,39 +305,49 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
             "player-id",
         ),
         (
-            '<pl-media-player file-name="clip.wav" allow-muting="sometimes"></pl-media-player>',
+            '<pl-media-player file-name="clip.wav" allow-muting="sometimes" '
+            'player-id="main"></pl-media-player>',
             "allow-muting",
         ),
         (
+            '<pl-media-player file-name="clip.wav" '
+            'allow-overlapping-playback="sometimes" player-id="main"></pl-media-player>',
+            "allow-overlapping-playback",
+        ),
+        (
             '<pl-media-player source-directory="clips" randomize="true" '
-            'media-type="audio" extensions="mp4"></pl-media-player>',
+            'media-type="audio" extensions="mp4" player-id="main"></pl-media-player>',
             "Unsupported extensions",
         ),
         (
-            '<pl-media-player url="ftp://media.example.test/clip.mp3"></pl-media-player>',
+            '<pl-media-player url="ftp://media.example.test/clip.mp3" '
+            'player-id="main"></pl-media-player>',
             "absolute HTTP",
         ),
         (
-            '<pl-media-player url="https://media.example.test/playback"></pl-media-player>',
+            '<pl-media-player url="https://media.example.test/playback" '
+            'player-id="main"></pl-media-player>',
             "Cannot infer the media type",
         ),
         (
             '<pl-media-player url="https://media.example.test/clip.mp4" '
-            'media-type="audio"></pl-media-player>',
+            'media-type="audio" player-id="main"></pl-media-player>',
             "not audio media",
         ),
         (
             '<pl-media-player file-name="clip.wav" '
-            'url="https://media.example.test/clip.wav"></pl-media-player>',
+            'url="https://media.example.test/clip.wav" '
+            'player-id="main"></pl-media-player>',
             "cannot be combined",
         ),
         (
             '<pl-media-player url="https://www.youtube.com/watch?v=VIDEO_ID" '
-            'max-plays="2"></pl-media-player>',
+            'max-plays="2" player-id="main"></pl-media-player>',
             "YouTube url cannot be combined",
         ),
         (
-            '<pl-media-player url="https://www.youtube.com/watch"></pl-media-player>',
+            '<pl-media-player url="https://www.youtube.com/watch" '
+            'player-id="main"></pl-media-player>',
             "YouTube url must identify a video",
         ),
     ],
@@ -330,9 +364,9 @@ def test_duplicate_explicit_player_id_is_rejected(data):
     write_media(data, "clip.wav")
     html = '<pl-media-player file-name="clip.wav" player-id="same"></pl-media-player>'
 
-    prepare(html, data, 0)
+    prepare(html, data)
     with pytest.raises(ValueError, match="Duplicate player-id"):
-        prepare(html, data, 1)
+        prepare(html, data)
 
 
 def test_render_configuration_uses_variant_and_stable_player_identity(data):
@@ -340,7 +374,7 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
     html = (
         '<pl-media-player file-name="folder name/clip.wav" player-id="prompt" '
         'max-plays="2" allow-pause="false" allow-seeking="false" '
-        'persist="variant"></pl-media-player>'
+        'allow-overlapping-playback="true" persist="variant"></pl-media-player>'
     )
 
     prepare(html, data)
@@ -351,6 +385,7 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
     assert "folder%20name/clip.wav" in output
     assert config == {
         "allowMuting": False,
+        "allowOverlappingPlayback": True,
         "allowPause": False,
         "allowSeeking": False,
         "maxPlays": 2,
@@ -365,7 +400,7 @@ def test_player_messages_share_one_line_below_the_controls(data):
     write_media(data, "clip.wav")
     html = (
         '<pl-media-player file-name="clip.wav" max-plays="1" '
-        'allow-pause="false"></pl-media-player>'
+        'allow-pause="false" player-id="messages"></pl-media-player>'
     )
 
     prepare(html, data)
@@ -396,7 +431,7 @@ def test_player_messages_share_one_line_below_the_controls(data):
 
 def test_video_and_controls_render_as_one_continuous_frame(data):
     write_media(data, "clip.mp4")
-    html = '<pl-media-player file-name="clip.mp4"></pl-media-player>'
+    html = '<pl-media-player file-name="clip.mp4" player-id="video"></pl-media-player>'
 
     prepare(html, data)
     document = media_player.lxml.html.fragment_fromstring(render(html, data))
@@ -410,7 +445,7 @@ def test_video_and_controls_render_as_one_continuous_frame(data):
 
 def test_media_buttons_render_accessible_svg_icons(data):
     write_media(data, "clip.wav")
-    html = '<pl-media-player file-name="clip.wav"></pl-media-player>'
+    html = '<pl-media-player file-name="clip.wav" player-id="icons"></pl-media-player>'
 
     prepare(html, data)
     document = media_player.lxml.html.fragment_fromstring(render(html, data))
@@ -483,7 +518,10 @@ def test_playback_count_is_restored_from_submission_and_excluded_from_answers(da
 )
 def test_allow_muting_resolves_auto_and_explicit_values(data, attributes, expected):
     write_media(data, "clip.wav")
-    html = f'<pl-media-player file-name="clip.wav" {attributes}></pl-media-player>'
+    html = (
+        f'<pl-media-player file-name="clip.wav" player-id="muting" '
+        f"{attributes}></pl-media-player>"
+    )
 
     prepare(html, data)
     output = render(html, data)

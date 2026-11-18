@@ -2,6 +2,11 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
   "properties": {
+    "allow-overlapping-playback": {
+      "default": "false",
+      "type": "string",
+      "format": "boolean"
+    },
     "allow-pause": {
       "default": "true",
       "type": "string",
@@ -41,6 +46,7 @@
       "enum": ["none", "variant"]
     },
     "player-id": {
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
       "type": "string"
     },
     "randomize": {
@@ -60,6 +66,7 @@
       "type": "string"
     }
   },
+  "required": ["player-id"],
   "oneOf": [
     { "required": ["file-name"] },
     { "required": ["url"] },

@@ -51,10 +51,13 @@ PrairieLearn course.
 
 ## Usage
 
+Every `pl-media-player` requires a `player-id` that is unique within the question. The ID namespaces
+the element's submitted playback count and any browser-local persistence.
+
 Basic audio:
 
 ```html
-<pl-media-player file-name="conversation.wav"></pl-media-player>
+<pl-media-player file-name="conversation.wav" player-id="conversation"></pl-media-player>
 ```
 
 Two allowed sessions, with pause/resume but no seeking:
@@ -65,6 +68,7 @@ Two allowed sessions, with pause/resume but no seeking:
   allow-seeking="false"
   file-name="conversation.mp3"
   max-plays="2"
+  player-id="conversation"
 ></pl-media-player>
 ```
 
@@ -72,7 +76,12 @@ Players with `max-plays` prevent muting and zero volume by default. Override tha
 needed:
 
 ```html
-<pl-media-player allow-muting="true" file-name="conversation.mp3" max-plays="2"></pl-media-player>
+<pl-media-player
+  allow-muting="true"
+  file-name="conversation.mp3"
+  max-plays="2"
+  player-id="conversation"
+></pl-media-player>
 ```
 
 Variant-scoped browser persistence:
@@ -93,6 +102,7 @@ Random direct child of a question-local directory:
   directory="clientFilesQuestion"
   extensions="mp3, wav"
   max-plays="2"
+  player-id="random-prompt"
   randomize="true"
   source-directory="listening/unit-01"
 ></pl-media-player>
@@ -104,13 +114,17 @@ Course-local media is also supported:
 <pl-media-player
   directory="clientFilesCourse"
   file-name="shared/listening-prompt.mp3"
+  player-id="shared-prompt"
 ></pl-media-player>
 ```
 
 External media can be loaded from an absolute HTTP(S) URL:
 
 ```html
-<pl-media-player url="https://cdn.example.com/listening-prompt.mp3"></pl-media-player>
+<pl-media-player
+  player-id="external-prompt"
+  url="https://cdn.example.com/listening-prompt.mp3"
+></pl-media-player>
 ```
 
 For extensionless URLs and streaming endpoints, specify the media family explicitly:
@@ -118,6 +132,7 @@ For extensionless URLs and streaming endpoints, specify the media family explici
 ```html
 <pl-media-player
   media-type="video"
+  player-id="stream"
   url="https://media.example.com/playback?id=example"
 ></pl-media-player>
 ```
@@ -125,33 +140,38 @@ For extensionless URLs and streaming endpoints, specify the media family explici
 YouTube watch, share, Shorts, live, and embed URLs are converted to an HTTPS embed:
 
 ```html
-<pl-media-player url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"></pl-media-player>
+<pl-media-player
+  player-id="video"
+  url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+></pl-media-player>
 ```
 
-A YouTube URL must be the element's only attribute. Playback budgets, persistence, and the native
-pause, seek, and mute restrictions do not apply inside the YouTube iframe.
+A YouTube URL cannot be combined with attributes other than the required `player-id`. Playback
+budgets, persistence, and the native pause, seek, and mute restrictions do not apply inside the
+YouTube iframe.
 
 Publicly shared PrairieLearn questions should use `clientFilesQuestion`: shared questions cannot
 depend on the source course's `clientFilesCourse`.
 
 ## Attributes
 
-| Attribute          | Default               | Description                                                                           |
-| ------------------ | --------------------- | ------------------------------------------------------------------------------------- |
-| `file-name`        | —                     | Explicit POSIX-relative path below the selected client-files root.                    |
-| `url`              | —                     | Absolute HTTP(S) media or YouTube URL; mutually exclusive with other source options.  |
-| `directory`        | `clientFilesQuestion` | `clientFilesQuestion` or `clientFilesCourse`.                                         |
-| `source-directory` | —                     | Direct-child discovery directory used with `randomize="true"`.                        |
-| `randomize`        | `false`               | Select and persist one eligible file during variant preparation.                      |
-| `max-plays`        | unlimited             | Positive number of playback sessions allowed.                                         |
-| `allow-muting`     | `auto`                | `auto`, `true`, or `false`; auto prevents silence when playback is limited.           |
-| `allow-pause`      | `true`                | Permit pausing and resuming the active session.                                       |
-| `allow-seeking`    | `true`                | Permit moving within the active session.                                              |
-| `show-remaining`   | `true`                | Show the remaining session count or the unlimited label.                              |
-| `persist`          | `none`                | `none` or browser-local `variant` persistence.                                        |
-| `media-type`       | `auto`                | `auto`, `audio`, or `video`; required for URLs without a recognized extension.        |
-| `extensions`       | supported formats     | Comma-separated discovery filter; only valid with random selection.                   |
-| `player-id`        | document-order ID     | Stable identifier. Set it explicitly when persistence must survive markup reordering. |
+| Attribute                    | Default               | Description                                                                           |
+| ---------------------------- | --------------------- | ------------------------------------------------------------------------------------- |
+| `file-name`                  | —                     | Explicit POSIX-relative path below the selected client-files root.                    |
+| `url`                        | —                     | Absolute HTTP(S) media or YouTube URL; mutually exclusive with other source options.  |
+| `directory`                  | `clientFilesQuestion` | `clientFilesQuestion` or `clientFilesCourse`.                                         |
+| `source-directory`           | —                     | Direct-child discovery directory used with `randomize="true"`.                        |
+| `randomize`                  | `false`               | Select and persist one eligible file during variant preparation.                      |
+| `max-plays`                  | unlimited             | Positive number of playback sessions allowed.                                         |
+| `allow-muting`               | `auto`                | `auto`, `true`, or `false`; auto prevents silence when playback is limited.           |
+| `allow-overlapping-playback` | `false`               | Permit simultaneous playback when every active player also opts in.                   |
+| `allow-pause`                | `true`                | Permit pausing and resuming the active session.                                       |
+| `allow-seeking`              | `true`                | Permit moving within the active session.                                              |
+| `show-remaining`             | `true`                | Show the remaining session count or the unlimited label.                              |
+| `persist`                    | `none`                | `none` or browser-local `variant` persistence.                                        |
+| `media-type`                 | `auto`                | `auto`, `audio`, or `video`; required for URLs without a recognized extension.        |
+| `extensions`                 | supported formats     | Comma-separated discovery filter; only valid with random selection.                   |
+| `player-id`                  | required              | Unique namespace for submitted playback state and browser-local persistence.          |
 
 Supported extension families are WAV, MP3, Ogg audio, AAC/M4A, FLAC, MP4/M4V, WebM, Ogg video,
 and QuickTime MOV. Actual codec playback depends on the student's browser and operating system;
@@ -163,6 +183,15 @@ An attempt is one playback session, not one native `play` event. The attempt is 
 browser reports that media is actually playing, so a load failure before playback does not consume
 the budget. An allowed pause and resume stays in the same session. Replaying after `ended` begins a
 new session. Once the budget is exhausted, a new session is paused and a visible message is shown.
+
+While a limited playback session is active, PrairieLearn treats the question form as dirty so that
+leaving the page triggers its unsaved-changes warning. The form becomes clean again when playback
+reaches the end, unless another answer has changed.
+
+By default, starting a native audio or video player pauses other active `pl-media-player` instances
+on the page. If a conflicting player has `allow-pause="false"`, the new playback is blocked without
+using an attempt. Simultaneous playback is allowed only when every involved player sets
+`allow-overlapping-playback="true"`. YouTube embeds are outside this coordination.
 
 The consumed count is included in each Save or Save and Grade submission, so rendering the saved
 submission does not reset the playback budget.
@@ -211,7 +240,11 @@ def generate(data):
 ```
 
 ```html
-<pl-media-player file-name="{{params.selected_clip}}" max-plays="2"></pl-media-player>
+<pl-media-player
+  file-name="{{params.selected_clip}}"
+  max-plays="2"
+  player-id="direction-prompt"
+></pl-media-player>
 <pl-string-input answers-name="direction"></pl-string-input>
 ```
 

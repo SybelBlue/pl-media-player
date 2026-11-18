@@ -1,6 +1,8 @@
 (($) => {
   'use strict';
 
+  const PLAYBACK_CONFLICT_MESSAGE =
+    'Another media player is playing and cannot be interrupted.';
   const VOLUME_STORAGE_KEY = 'pl-media-player:volume:v1';
   const volumePreferenceManagers = new WeakMap();
   let transientVolumePreferenceManager = null;
@@ -77,6 +79,32 @@
     transientVolumePreferenceManager ??= new VolumePreferenceManager(null);
     return transientVolumePreferenceManager;
   }
+
+  class PlaybackCoordinator {
+    constructor() {
+      this.controllers = new Set();
+    }
+
+    register(controller) {
+      this.controllers.add(controller);
+    }
+
+    requestPlayback(controller) {
+      const conflicts = [...this.controllers].filter(
+        (other) =>
+          other !== controller &&
+          other.media.paused === false &&
+          !other.media.ended &&
+          (!controller.config.allowOverlappingPlayback ||
+            !other.config.allowOverlappingPlayback),
+      );
+      if (conflicts.some((other) => !other.config.allowPause)) return false;
+      for (const other of conflicts) other.pauseForAnotherPlayer();
+      return true;
+    }
+  }
+
+  const playbackCoordinator = new PlaybackCoordinator();
 
   class PlaybackBudget {
     constructor(maxPlays, playsUsed = 0) {
@@ -159,6 +187,7 @@
         this.lastAppliedMuted = this.media.muted;
       }
       this.#bind();
+      playbackCoordinator.register(this);
       this.#renderState();
     }
 
@@ -191,6 +220,13 @@
       } catch {
         // Storage can be disabled, full, or blocked by browser privacy settings.
       }
+    }
+
+    #setUnloadDirty(dirty) {
+      if (this.budget.maxPlays === null) return;
+      // PrairieLearn excludes marked inputs from its beforeunload form comparison.
+      if (dirty) this.$playbackCount.removeAttr('data-skip-unload-check');
+      else this.$playbackCount.attr('data-skip-unload-check', 'true');
     }
 
     #bind() {
@@ -228,6 +264,10 @@
       }
       this.lastAppliedVolume = volume;
       this.lastAppliedMuted = this.media.muted;
+    }
+
+    pauseForAnotherPlayer() {
+      this.media.pause();
     }
 
     #setStatus(message) {
@@ -375,6 +415,11 @@
         this.#showLockout(this.$playLock);
         return;
       }
+      if (!playbackCoordinator.requestPlayback(this)) {
+        this.#setStatus(PLAYBACK_CONFLICT_MESSAGE);
+        this.#renderState();
+        return;
+      }
       const started = this.media.play();
       if (started && typeof started.catch === 'function') {
         started.catch(() => {
@@ -417,17 +462,20 @@
       this.media.muted = nextVolume === 0;
     }
 
-    #denyPlayback() {
+    #denyPlayback(message = this.config.showRemaining ? '' : 'No plays left.') {
       this.internalPause = true;
       this.media.pause();
-      this.internalPause = false;
-      this.#setStatus(this.config.showRemaining ? '' : 'No plays left.');
+      this.#setStatus(message);
       this.#renderState();
     }
 
     #onPlay() {
       if (!this.budget.sessionActive && this.budget.exhausted) {
         this.#denyPlayback();
+        return;
+      }
+      if (!playbackCoordinator.requestPlayback(this)) {
+        this.#denyPlayback(PLAYBACK_CONFLICT_MESSAGE);
         return;
       }
       this.#renderState();
@@ -441,13 +489,18 @@
         }
         this.#persist();
       }
+      this.#setUnloadDirty(true);
       this.#setStatus('');
       this.#renderState();
     }
 
     #onPause() {
+      if (this.internalPause) {
+        this.internalPause = false;
+        this.#renderState();
+        return;
+      }
       if (
-        this.internalPause ||
         this.media.ended ||
         !this.budget.sessionActive ||
         this.config.allowPause
@@ -463,6 +516,7 @@
 
     #onEnded() {
       this.budget.endSession();
+      this.#setUnloadDirty(false);
       this.lastAllowedTime = 0;
       this.#setStatus('');
       this.#renderState();
