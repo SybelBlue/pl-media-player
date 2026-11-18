@@ -1,0 +1,9 @@
+{
+  "uuid": "26428fda-31fb-4519-818b-1e7b7ac46de4",
+  "longName": "Starter Course Instance",
+  "groupAssessmentsBy": "Module",
+  "publishing": {
+    "startDate": "2026-01-01T00:00:01",
+    "endDate": "2099-12-31T23:59:59"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "PL Media Player",
+  "title": "PL Media Player",
+  "assessmentSets": [
+    {
+      "abbreviation": "Q",
+      "name": "Quiz",
+      "heading": "Quizzes",
+      "color": "yellow2"
+    }
+  ],
+  "topics": [
+    {
+      "name": "Starter",
+      "color": "gray1",
+      "description": "Starter content"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Easy",
+      "color": "green1",
+      "description": "Introductory difficulty"
+    }
+  ],
+  "timezone": "America/Chicago"
+}
