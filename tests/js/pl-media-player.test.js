@@ -7,6 +7,10 @@ const PLAYER_SOURCE = await readFile(
   new URL('../../elements/pl-media-player/pl-media-player.js', import.meta.url),
   'utf8',
 );
+const PLAYER_TEMPLATE_SOURCE = await readFile(
+  new URL('../../elements/pl-media-player/pl-media-player.mustache', import.meta.url),
+  'utf8',
+);
 
 class FakeElement extends EventTarget {
   constructor() {
@@ -300,6 +304,12 @@ function playbackKey(overrides = {}) {
   const playerConfig = config(overrides);
   return `pl-media-player:v1:${playerConfig.variantId}:${playerConfig.playerId}`;
 }
+
+test('all lockout popups use Bootstrap utility styling', () => {
+  const bootstrapClasses = /bg-dark text-white rounded px-2 py-1 small shadow-sm/g;
+  assert.equal(PLAYER_TEMPLATE_SOURCE.match(bootstrapClasses)?.length, 3);
+  assert.doesNotMatch(PLAYER_TEMPLATE_SOURCE, /\btooltip fade\b/);
+});
 
 test('unlimited playback does not show a remaining-attempt message', () => {
   const player = container({ maxPlays: null });
