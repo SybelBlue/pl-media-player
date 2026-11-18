@@ -60,5 +60,7 @@ def test_release_configuration_builds_root_level_element(tmp_path: Path):
         "pl-media-player.js",
         "pl-media-player.mustache",
         "pl-media-player.py",
+        "schema.json",
+        "schemas/pl-media-player.json",
         "test_pl_media_player.py",
     ]

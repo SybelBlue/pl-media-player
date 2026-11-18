@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "allow-pause": {
+      "default": "true",
+      "type": "string",
+      "format": "boolean"
+    },
+    "allow-seeking": {
+      "default": "true",
+      "type": "string",
+      "format": "boolean"
+    },
+    "directory": {
+      "default": "clientFilesQuestion",
+      "type": "string",
+      "enum": [
+        "clientFilesQuestion",
+        "clientFilesCourse"
+      ]
+    },
+    "extensions": {
+      "type": "string"
+    },
+    "file-name": {
+      "type": "string"
+    },
+    "max-plays": {
+      "type": "string",
+      "format": "integer"
+    },
+    "media-type": {
+      "default": "auto",
+      "type": "string",
+      "enum": ["auto", "audio", "video"]
+    },
+    "persist": {
+      "default": "none",
+      "type": "string",
+      "enum": ["none", "variant"]
+    },
+    "player-id": {
+      "type": "string"
+    },
+    "randomize": {
+      "default": "false",
+      "type": "string",
+      "format": "boolean"
+    },
+    "show-remaining": {
+      "default": "true",
+      "type": "string",
+      "format": "boolean"
+    },
+    "source-directory": {
+      "type": "string"
+    }
+  },
+  "oneOf": [
+    { "required": ["file-name"] },
+    {
+      "required": [
+        "source-directory",
+        "randomize"
+      ]
+    }
+  ],
+  "additionalProperties": false
+}
