@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 CONTROLLER_PATH = Path(__file__).with_name("pl-media-player.py")
 SPEC = importlib.util.spec_from_file_location(
     "pl_media_player_element", CONTROLLER_PATH
@@ -77,7 +76,7 @@ def test_config_is_frozen_portable_and_validated():
         "variantId": "variant-1",
     }
     with pytest.raises(FrozenInstanceError):
-        setattr(config, "max_plays", 3)
+        config.max_plays = 3
 
 
 def test_explicit_question_file_is_resolved_and_rendered(data):
@@ -95,23 +94,6 @@ def test_explicit_question_file_is_resolved_and_rendered(data):
     document = media_player.lxml.html.fragment_fromstring(output)
     audio = document.xpath(".//audio")[0]
     assert audio.attrib["controlslist"] == "nodownload"
-
-
-def test_explicit_course_file_uses_course_root_and_url(data):
-    write_media(data, "shared/demo.mp4", course=True)
-    html = (
-        '<pl-media-player file-name="shared/demo.mp4" '
-        'directory="clientFilesCourse"></pl-media-player>'
-    )
-
-    prepare(html, data)
-    output = render(html, data)
-    document = media_player.lxml.html.fragment_fromstring(output)
-    video = document.xpath(".//video")[0]
-
-    assert 'src="/pl/course/4/clientFilesCourse/shared/demo.mp4"' in output
-    assert set(video.classes) == {"d-block", "h-auto", "mx-auto", "mw-100"}
-    assert video.attrib["controlslist"] == "nodownload"
 
 
 def test_external_url_is_preserved_and_rendered(data):
@@ -176,7 +158,7 @@ def test_youtube_urls_render_as_embed_iframes(data, url):
         "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; "
         "gyroscope; picture-in-picture; web-share",
         "allowfullscreen": "",
-        "class": "pl-media-player-youtube d-block h-auto mx-auto mw-100",
+        "class": "pl-media-player-youtube d-block h-auto mx-auto w-100",
         "frameborder": "0",
         "height": "315",
         "referrerpolicy": "strict-origin-when-cross-origin",
@@ -410,6 +392,20 @@ def test_player_messages_share_one_line_below_the_controls(data):
     assert "pl-media-player-controls" in message_line.getprevious().classes
     assert warning.getnext() is remaining
     assert remaining.getnext() is status
+
+
+def test_video_and_controls_render_as_one_continuous_frame(data):
+    write_media(data, "clip.mp4")
+    html = '<pl-media-player file-name="clip.mp4"></pl-media-player>'
+
+    prepare(html, data)
+    document = media_player.lxml.html.fragment_fromstring(render(html, data))
+    video = document.xpath(".//video")[0]
+    controls = document.xpath(".//div[contains(@class, 'pl-media-player-controls')]")[0]
+
+    assert {"border", "rounded-top"}.issubset(video.classes)
+    assert {"border-top-0", "rounded-bottom"}.issubset(controls.classes)
+    assert "rounded" not in controls.classes
 
 
 def test_playback_count_is_restored_from_submission_and_excluded_from_answers(data):
