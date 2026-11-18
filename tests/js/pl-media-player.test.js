@@ -99,7 +99,7 @@ class FakeContainer extends FakeElement {
     this.playbackWarning.hidden = true;
     this.playbackWarning.setAttribute(
       'class',
-      'pl-media-player-playback-warning small text-danger mb-1',
+      'pl-media-player-playback-warning text-danger',
     );
     this.remaining = new FakeElement();
     this.status = new FakeElement();
@@ -324,11 +324,11 @@ test('initial playback consumes one attempt and pause/resume does not consume an
   loadPlayers([player]);
 
   player.media.emit('playing');
-  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
+  assert.equal(player.remaining.textContent, '1 play left.');
 
   player.media.emit('pause');
   player.media.emit('playing');
-  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
+  assert.equal(player.remaining.textContent, '1 play left.');
 });
 
 test('replay consumes another attempt and replay after exhaustion is denied', () => {
@@ -341,9 +341,9 @@ test('replay consumes another attempt and replay after exhaustion is denied', ()
   player.media.ended = false;
   player.media.emit('play');
 
-  assert.equal(player.remaining.textContent, '0 playback attempts remaining.');
+  assert.equal(player.remaining.textContent, 'No plays left.');
   assert.equal(player.media.pauseCalls, 1);
-  assert.match(player.status.textContent, /limit reached/i);
+  assert.equal(player.status.textContent, '');
 });
 
 test('disallowed pause is immediately resumed without another attempt', () => {
@@ -354,7 +354,7 @@ test('disallowed pause is immediately resumed without another attempt', () => {
   player.media.emit('pause');
 
   assert.equal(player.media.playCalls, 1);
-  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
+  assert.equal(player.remaining.textContent, '1 play left.');
 });
 
 test('a prohibited pause disables the button and explains the lockout when pressed', () => {
@@ -372,11 +372,11 @@ test('a prohibited pause disables the button and explains the lockout when press
   assert.equal(player.playButton.textContent, 'Pause');
   assert.equal(player.playLock.getAttribute('data-locked'), 'true');
   assert.equal(player.playLock.getAttribute('tabindex'), '0');
-  assert.match(player.playTooltip.textContent, /pausing is disabled/i);
+  assert.equal(player.playTooltip.textContent, 'Pausing disabled.');
 
   player.playLock.emit('click');
 
-  assert.match(player.status.textContent, /pausing is disabled/i);
+  assert.equal(player.status.textContent, 'Pausing disabled.');
   assert.equal(player.playLock.getAttribute('data-show-tooltip'), 'true');
   assert.equal(player.media.pauseCalls, 0);
 });
@@ -391,7 +391,7 @@ test('a final unpausable attempt is red and warned about before playback', () =>
   assert.match(player.playButton.getAttribute('class'), /\bbtn-danger\b/);
   assert.doesNotMatch(player.playButton.getAttribute('class'), /\bbtn-outline-secondary\b/);
   assert.equal(player.playbackWarning.hidden, false);
-  assert.equal(player.playbackWarning.textContent, 'Playback cannot be stopped once started.');
+  assert.equal(player.playbackWarning.textContent, 'Final play; pausing disabled.');
   assert.match(player.playbackWarning.getAttribute('class'), /\btext-danger\b/);
   assert.equal(player.status.textContent, '');
 
@@ -420,7 +420,7 @@ test('the warning appears when a later playback becomes the final unpausable att
   assert.equal(player.playButton.disabled, false);
   assert.equal(player.playButton.getAttribute('data-warning'), 'true');
   assert.equal(player.playbackWarning.hidden, false);
-  assert.equal(player.playbackWarning.textContent, 'Playback cannot be stopped once started.');
+  assert.equal(player.playbackWarning.textContent, 'Final play; pausing disabled.');
   assert.equal(player.status.textContent, '');
 });
 
@@ -453,14 +453,14 @@ test('locked controls expose warnings to pointer and keyboard users', () => {
 
   assert.equal(player.muteButton.disabled, true);
   assert.equal(player.seek.disabled, true);
-  assert.match(player.muteTooltip.textContent, /muting is disabled/i);
-  assert.match(player.seekTooltip.textContent, /seeking is disabled/i);
+  assert.equal(player.muteTooltip.textContent, 'Muting disabled.');
+  assert.equal(player.seekTooltip.textContent, 'Seeking disabled.');
 
   player.muteLock.emit('keydown', { key: 'Enter' });
-  assert.match(player.status.textContent, /muting is disabled/i);
+  assert.equal(player.status.textContent, 'Muting disabled.');
 
   player.seekLock.emit('click');
-  assert.match(player.status.textContent, /seeking is disabled/i);
+  assert.equal(player.status.textContent, 'Seeking disabled.');
 });
 
 test('play is disabled with a warning once all attempts are exhausted', () => {
@@ -473,10 +473,23 @@ test('play is disabled with a warning once all attempts are exhausted', () => {
 
   assert.equal(player.playButton.disabled, true);
   assert.equal(player.playButton.textContent, 'Play');
-  assert.match(player.playTooltip.textContent, /limit reached/i);
+  assert.equal(player.playTooltip.textContent, 'No plays left.');
 
   player.playLock.emit('click');
-  assert.match(player.status.textContent, /limit reached/i);
+  assert.equal(player.status.textContent, '');
+});
+
+test('exhaustion is announced below the player when the remaining count is hidden', () => {
+  const player = container({ maxPlays: 1, showRemaining: false });
+  loadPlayers([player]);
+
+  player.media.emit('playing');
+  player.media.ended = true;
+  player.media.emit('ended');
+  player.playLock.emit('click');
+
+  assert.equal(player.remaining.textContent, '');
+  assert.equal(player.status.textContent, 'No plays left.');
 });
 
 test('seeking can be prohibited or permitted', () => {
@@ -503,11 +516,11 @@ test('persisted counts survive reload while a new variant is independent', () =>
 
   const reloaded = container({ persist: true, variantId: 'first' });
   loadPlayers([reloaded], storage);
-  assert.equal(reloaded.remaining.textContent, '1 playback attempt remaining.');
+  assert.equal(reloaded.remaining.textContent, '1 play left.');
 
   const nextVariant = container({ persist: true, variantId: 'second' });
   loadPlayers([nextVariant], storage);
-  assert.equal(nextVariant.remaining.textContent, '2 playback attempts remaining.');
+  assert.equal(nextVariant.remaining.textContent, '2 plays left.');
 });
 
 test('submitted playback count survives Save and Grade without browser persistence', () => {
@@ -520,10 +533,10 @@ test('submitted playback count survives Save and Grade without browser persisten
   const rerendered = container({}, first.playbackCount.value);
   loadPlayers([rerendered]);
 
-  assert.equal(rerendered.remaining.textContent, '1 playback attempt remaining.');
+  assert.equal(rerendered.remaining.textContent, '1 play left.');
   rerendered.media.emit('playing');
   assert.equal(rerendered.playbackCount.value, '2');
-  assert.equal(rerendered.remaining.textContent, '0 playback attempts remaining.');
+  assert.equal(rerendered.remaining.textContent, 'No plays left.');
 });
 
 test('multiple players use independent storage keys', () => {
@@ -534,8 +547,8 @@ test('multiple players use independent storage keys', () => {
 
   first.media.emit('playing');
 
-  assert.equal(first.remaining.textContent, '1 playback attempt remaining.');
-  assert.equal(second.remaining.textContent, '2 playback attempts remaining.');
+  assert.equal(first.remaining.textContent, '1 play left.');
+  assert.equal(second.remaining.textContent, '2 plays left.');
   assert.equal(storage.values.size, 1);
 });
 
@@ -638,7 +651,7 @@ test('a loading failure before playing consumes no attempt', () => {
   player.media.emit('error');
 
   assert.equal(storage.getItem(playbackKey({ persist: true })), null);
-  assert.match(player.status.textContent, /no playback attempt was used/i);
+  assert.equal(player.status.textContent, 'Media failed to load; play not used.');
 });
 
 test('blocked localStorage does not crash playback', () => {
@@ -656,7 +669,7 @@ test('blocked localStorage does not crash playback', () => {
   assert.doesNotThrow(() => player.media.emit('playing'));
   player.media.volume = 0.5;
   assert.doesNotThrow(() => player.media.emit('volumechange'));
-  assert.equal(player.remaining.textContent, '1 playback attempt remaining.');
+  assert.equal(player.remaining.textContent, '1 play left.');
 });
 
 test('the implementation does not publish an application API globally', () => {

@@ -6,7 +6,7 @@
 >
   {{#youtube}}
     <iframe
-      class="pl-media-player-youtube"
+      class="pl-media-player-youtube d-block h-auto mx-auto mw-100"
       width="560"
       height="315"
       src="{{src}}"
@@ -26,13 +26,24 @@
       data-skip-unload-check="true"
     />
     {{#audio}}
-      <audio controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
+      <audio
+        controls
+        controlslist="nodownload"
+        preload="metadata"
+        aria-describedby="pl-media-player-status-{{dom_id}}"
+      >
         <source src="{{src}}" {{#mime_type}} type="{{mime_type}}"{{/mime_type}} /> Your browser
         cannot play this audio file.
       </audio>
     {{/audio}}
     {{#video}}
-      <video controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
+      <video
+        class="d-block h-auto mx-auto mw-100"
+        controls
+        controlslist="nodownload"
+        preload="metadata"
+        aria-describedby="pl-media-player-status-{{dom_id}}"
+      >
         <source src="{{src}}" {{#mime_type}} type="{{mime_type}}"{{/mime_type}} /> Your browser
         cannot play this video file.
       </video>
@@ -106,17 +117,12 @@
         aria-label="Volume"
       />
     </div>
-    <p class="pl-media-player-playback-message small mb-1" aria-live="polite">
+    <p class="pl-media-player-message small text-nowrap mb-0" aria-live="polite">
       <span class="pl-media-player-playback-warning text-danger" hidden></span>
       {{#show_remaining}}
         <span class="pl-media-player-remaining text-muted"></span>
       {{/show_remaining}}
-    </p>
-    <p
-      class="pl-media-player-status small text-danger mb-0"
-      id="pl-media-player-status-{{dom_id}}"
-      aria-live="polite"
-    >
+      <span class="pl-media-player-status text-danger" id="pl-media-player-status-{{dom_id}}"></span>
     </p>
   {{/youtube}}
 </div>

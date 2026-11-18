@@ -251,7 +251,7 @@
     #showLockout($lock) {
       const message = $lock.attr('data-lockout-message');
       if (!message) return;
-      this.#setStatus(message);
+      this.#setStatus(message === this.$remaining.text() ? '' : message);
       $lock.attr('data-show-tooltip', 'true');
     }
 
@@ -295,8 +295,8 @@
         !this.config.allowPause &&
         this.budget.remaining === 1;
       const playMessage = inactiveAndExhausted
-        ? 'Playback limit reached. No attempts remain.'
-        : 'Pausing is disabled for this playback.';
+        ? 'No plays left.'
+        : 'Pausing disabled.';
       this.$playButton.text(playLabel).attr('aria-label', playLabel);
       this.$playButton.attr('data-warning', String(finalUnpausableAttempt));
       this.$playButton.toggleClass('btn-danger', finalUnpausableAttempt);
@@ -315,7 +315,7 @@
         this.$seek,
         this.$seekTooltip,
         !this.config.allowSeeking,
-        'Seeking is disabled for this playback.',
+        'Seeking disabled.',
         'Seek',
       );
 
@@ -327,7 +327,7 @@
         this.$muteButton,
         this.$muteTooltip,
         !this.config.allowMuting,
-        'Muting is disabled for this playback.',
+        'Muting disabled.',
         muteLabel,
       );
       this.$volume.attr('min', this.config.allowMuting ? '0' : '0.01');
@@ -342,7 +342,9 @@
         this.$remaining.text(
           remaining === null
             ? ''
-            : `${remaining} playback ${remaining === 1 ? 'attempt' : 'attempts'} remaining.`,
+            : remaining === 0
+              ? 'No plays left.'
+              : `${remaining} ${remaining === 1 ? 'play' : 'plays'} left.`,
         );
       }
       const inactiveAndExhausted = this.budget.exhausted && !this.budget.sessionActive;
@@ -356,7 +358,7 @@
         this.budget.remaining === 1;
       this.$playbackWarning.prop('hidden', !finalUnpausableAttempt);
       this.$playbackWarning.text(
-        finalUnpausableAttempt ? 'Playback cannot be stopped once started.' : '',
+        finalUnpausableAttempt ? 'Final play; pausing disabled.' : '',
       );
     }
 
@@ -377,7 +379,7 @@
       const started = this.media.play();
       if (started && typeof started.catch === 'function') {
         started.catch(() => {
-          this.#setStatus('Playback could not be started.');
+          this.#setStatus('Could not start playback.');
           this.#renderState();
         });
       }
@@ -415,7 +417,7 @@
       this.internalPause = true;
       this.media.pause();
       this.internalPause = false;
-      this.#setStatus('Playback limit reached. No attempts remain.');
+      this.#setStatus(this.config.showRemaining ? '' : 'No plays left.');
       this.#renderState();
     }
 
@@ -449,7 +451,7 @@
         this.#renderState();
         return;
       }
-      this.#setStatus('Pausing is disabled for this playback.');
+      this.#setStatus('Pausing disabled.');
       const resumed = this.media.play();
       if (resumed && typeof resumed.catch === 'function') resumed.catch(() => {});
       this.#renderState();
@@ -458,9 +460,7 @@
     #onEnded() {
       this.budget.endSession();
       this.lastAllowedTime = 0;
-      if (this.budget.exhausted) {
-        this.#setStatus('Playback limit reached. No attempts remain.');
-      }
+      this.#setStatus('');
       this.#renderState();
     }
 
@@ -475,7 +475,7 @@
       this.internalSeek = true;
       this.media.currentTime = this.lastAllowedTime;
       this.internalSeek = false;
-      this.#setStatus('Seeking is disabled for this playback.');
+      this.#setStatus('Seeking disabled.');
       this.#renderProgress();
     }
 
@@ -486,7 +486,7 @@
           lastAudibleVolume: this.lastAudibleVolume,
         };
         this.applyVolumePreference(preference, false);
-        this.#setStatus('Muting is disabled for this playback.');
+        this.#setStatus('Muting disabled.');
         this.#renderState();
         return;
       }
@@ -513,9 +513,9 @@
 
     #onError() {
       if (!this.budget.sessionActive) {
-        this.#setStatus('The media file could not be loaded. No playback attempt was used.');
+        this.#setStatus('Media failed to load; play not used.');
       } else {
-        this.#setStatus('The media file could not continue playing.');
+        this.#setStatus('Media stopped unexpectedly.');
       }
       this.#renderState();
     }
@@ -534,7 +534,7 @@
         $container
           .find('.pl-media-player-status')
           .first()
-          .text('The media player could not be initialized.');
+          .text('Player failed to load.');
         console.error('pl-media-player initialization failed', error);
       }
     });

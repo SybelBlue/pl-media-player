@@ -92,7 +92,9 @@ def test_explicit_question_file_is_resolved_and_rendered(data):
         == "clips/hello.wav"
     )
     assert 'src="/q/7/clientFilesQuestion/clips/hello.wav"' in output
-    assert "<audio" in output
+    document = media_player.lxml.html.fragment_fromstring(output)
+    audio = document.xpath(".//audio")[0]
+    assert audio.attrib["controlslist"] == "nodownload"
 
 
 def test_explicit_course_file_uses_course_root_and_url(data):
@@ -104,9 +106,12 @@ def test_explicit_course_file_uses_course_root_and_url(data):
 
     prepare(html, data)
     output = render(html, data)
+    document = media_player.lxml.html.fragment_fromstring(output)
+    video = document.xpath(".//video")[0]
 
     assert 'src="/pl/course/4/clientFilesCourse/shared/demo.mp4"' in output
-    assert "<video" in output
+    assert set(video.classes) == {"d-block", "h-auto", "mx-auto", "mw-100"}
+    assert video.attrib["controlslist"] == "nodownload"
 
 
 def test_external_url_is_preserved_and_rendered(data):
@@ -171,7 +176,7 @@ def test_youtube_urls_render_as_embed_iframes(data, url):
         "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; "
         "gyroscope; picture-in-picture; web-share",
         "allowfullscreen": "",
-        "class": "pl-media-player-youtube",
+        "class": "pl-media-player-youtube d-block h-auto mx-auto mw-100",
         "frameborder": "0",
         "height": "315",
         "referrerpolicy": "strict-origin-when-cross-origin",
@@ -374,7 +379,7 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
     }
 
 
-def test_playback_warning_is_red_and_inline_before_remaining_count(data):
+def test_player_messages_share_one_line_below_the_controls(data):
     write_media(data, "clip.wav")
     html = (
         '<pl-media-player file-name="clip.wav" max-plays="1" '
@@ -391,11 +396,20 @@ def test_playback_warning_is_red_and_inline_before_remaining_count(data):
         ".//span[contains(concat(' ', normalize-space(@class), ' '), "
         "' pl-media-player-remaining ')]"
     )[0]
+    status = document.xpath(
+        ".//span[contains(concat(' ', normalize-space(@class), ' '), "
+        "' pl-media-player-status ')]"
+    )[0]
+    message_line = warning.getparent()
 
     assert "text-danger" in warning.classes
     assert "hidden" in warning.attrib
-    assert warning.getparent() is remaining.getparent()
+    assert "text-nowrap" in message_line.classes
+    assert message_line is remaining.getparent()
+    assert message_line is status.getparent()
+    assert "pl-media-player-controls" in message_line.getprevious().classes
     assert warning.getnext() is remaining
+    assert remaining.getnext() is status
 
 
 def test_playback_count_is_restored_from_submission_and_excluded_from_answers(data):
