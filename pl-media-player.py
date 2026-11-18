@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import itertools
 import json
 import re
 from dataclasses import dataclass
@@ -65,6 +64,7 @@ PLAYER_ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 YOUTUBE_VIDEO_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 OPTIONAL_ATTRIBUTES = [
     "allow-muting",
+    "allow-overlapping-playback",
     "allow-pause",
     "allow-seeking",
     "directory",
@@ -73,19 +73,11 @@ OPTIONAL_ATTRIBUTES = [
     "max-plays",
     "media-type",
     "persist",
-    "player-id",
     "randomize",
     "show-remaining",
     "source-directory",
     "url",
 ]
-
-# PrairieLearn loads a fresh controller module for each lifecycle phase and invokes
-# element instances in document order. Separate counters therefore produce the same
-# stable automatic identity during prepare, render, and parse.
-_prepare_indices = itertools.count()
-_render_indices = itertools.count()
-_parse_indices = itertools.count()
 
 
 def _element(element_html: str | bytes) -> lxml.html.HtmlElement:
@@ -127,8 +119,8 @@ def _persist(element: lxml.html.HtmlElement) -> Persist:
         ) from exc
 
 
-def _player_id(element: lxml.html.HtmlElement, instance_index: int) -> str:
-    return pl.get_string_attrib(element, "player-id", f"auto-{instance_index + 1}")
+def _player_id(element: lxml.html.HtmlElement) -> str:
+    return pl.get_string_attrib(element, "player-id")
 
 
 def _playback_count_name(player_id: str) -> str:
@@ -297,6 +289,7 @@ class Config:
     """Validated element configuration shared by prepare and render."""
 
     allow_muting: bool
+    allow_overlapping_playback: bool
     allow_pause: bool
     allow_seeking: bool
     directory: Directory
@@ -368,11 +361,11 @@ class Config:
             )
 
     @classmethod
-    def from_element(
-        cls, element: lxml.html.HtmlElement, instance_index: int
-    ) -> Config:
+    def from_element(cls, element: lxml.html.HtmlElement) -> Config:
         pl.check_attribs(
-            element, required_attribs=[], optional_attribs=OPTIONAL_ATTRIBUTES
+            element,
+            required_attribs=["player-id"],
+            optional_attribs=OPTIONAL_ATTRIBUTES,
         )
         url = pl.get_string_attrib(element, "url", None)
         if url is not None:
@@ -394,6 +387,9 @@ class Config:
         max_plays = _max_plays(element)
         return cls(
             allow_muting=_allow_muting(element, max_plays),
+            allow_overlapping_playback=pl.get_boolean_attrib(
+                element, "allow-overlapping-playback", False
+            ),
             allow_pause=pl.get_boolean_attrib(element, "allow-pause", True),
             allow_seeking=pl.get_boolean_attrib(element, "allow-seeking", True),
             directory=directory,
@@ -402,7 +398,7 @@ class Config:
             max_plays=max_plays,
             media_type=media_type,
             persist=_persist(element),
-            player_id=_player_id(element, instance_index),
+            player_id=_player_id(element),
             randomize=pl.get_boolean_attrib(element, "randomize", False),
             show_remaining=pl.get_boolean_attrib(element, "show-remaining", True),
             source_directory=pl.get_string_attrib(element, "source-directory", None),
@@ -424,6 +420,7 @@ class Config:
     def to_client_dict(self, variant_id: str) -> dict[str, bool | int | str | None]:
         return {
             "allowMuting": self.allow_muting,
+            "allowOverlappingPlayback": self.allow_overlapping_playback,
             "allowPause": self.allow_pause,
             "allowSeeking": self.allow_seeking,
             "maxPlays": self.max_plays,
@@ -504,11 +501,9 @@ def _state(data: pl.QuestionData) -> dict[str, dict[str, str]]:
     return value
 
 
-def _prepare_with_index(
-    element_html: str | bytes, data: pl.QuestionData, instance_index: int
-) -> None:
+def prepare(element_html: str, data: pl.QuestionData) -> None:
     element = _element(element_html)
-    config = Config.from_element(element, instance_index)
+    config = Config.from_element(element)
 
     state = _state(data)
     if config.player_id in state:
@@ -538,33 +533,21 @@ def _prepare_with_index(
         }
 
 
-def prepare(element_html: str, data: pl.QuestionData) -> None:
-    _prepare_with_index(element_html, data, next(_prepare_indices))
-
-
-def _parse_with_index(
-    element_html: str | bytes, data: pl.QuestionData, instance_index: int
-) -> None:
+def parse(element_html: str, data: pl.QuestionData) -> None:
     element = _element(element_html)
-    config = Config.from_element(element, instance_index)
+    config = Config.from_element(element)
     # Preserve the count in raw submission metadata without exposing it as a
     # gradable answer.
     data["submitted_answers"].pop(_playback_count_name(config.player_id), None)
-
-
-def parse(element_html: str, data: pl.QuestionData) -> None:
-    _parse_with_index(element_html, data, next(_parse_indices))
 
 
 def _url_path(file_name: str) -> str:
     return "/".join(quote(part, safe="") for part in PurePosixPath(file_name).parts)
 
 
-def _render_with_index(
-    element_html: str | bytes, data: pl.QuestionData, instance_index: int
-) -> str:
+def render(element_html: str, data: pl.QuestionData) -> str:
     element = _element(element_html)
-    config = Config.from_element(element, instance_index)
+    config = Config.from_element(element)
     state = data["params"].get(PARAMS_KEY, {})
     if not isinstance(state, dict) or config.player_id not in state:
         raise ValueError(
@@ -610,7 +593,3 @@ def _render_with_index(
         Path(__file__).with_name("pl-media-player.mustache").read_text(encoding="utf-8")
     )
     return chevron.render(template, params).strip()
-
-
-def render(element_html: str, data: pl.QuestionData) -> str:
-    return _render_with_index(element_html, data, next(_render_indices))
