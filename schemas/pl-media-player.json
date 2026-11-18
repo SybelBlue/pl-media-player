@@ -55,10 +55,14 @@
     },
     "source-directory": {
       "type": "string"
+    },
+    "url": {
+      "type": "string"
     }
   },
   "oneOf": [
     { "required": ["file-name"] },
+    { "required": ["url"] },
     {
       "required": [
         "source-directory",

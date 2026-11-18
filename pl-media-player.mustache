@@ -1,26 +1,113 @@
+{{! htmlmustache-disable pl-prefer-pl-inputs }}
 <div
   class="pl-media-player"
   id="pl-media-player-{{dom_id}}"
   data-pl-media-player-config="{{config_json}}"
 >
-  {{#audio}}
-    <audio controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
-      <source src="{{src}}" type="{{mime_type}}" /> Your browser cannot play this audio file.
-    </audio>
-  {{/audio}}
-  {{#video}}
-    <video controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
-      <source src="{{src}}" type="{{mime_type}}" /> Your browser cannot play this video file.
-    </video>
-  {{/video}}
-  {{#show_remaining}}
-    <p class="pl-media-player-remaining small text-muted mb-1" aria-live="polite">
+  {{#youtube}}
+    <iframe
+      class="pl-media-player-youtube"
+      width="560"
+      height="315"
+      src="{{src}}"
+      title="YouTube video player"
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      referrerpolicy="strict-origin-when-cross-origin"
+      allowfullscreen
+    ></iframe>
+  {{/youtube}}
+  {{^youtube}}
+    {{#audio}}
+      <audio controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
+        <source src="{{src}}" {{#mime_type}} type="{{mime_type}}"{{/mime_type}} /> Your browser
+        cannot play this audio file.
+      </audio>
+    {{/audio}}
+    {{#video}}
+      <video controls preload="metadata" aria-describedby="pl-media-player-status-{{dom_id}}">
+        <source src="{{src}}" {{#mime_type}} type="{{mime_type}}"{{/mime_type}} /> Your browser
+        cannot play this video file.
+      </video>
+    {{/video}}
+    <div class="pl-media-player-controls" role="group" aria-label="Media controls" hidden>
+      <span
+        class="pl-media-player-control-lock pl-media-player-play-lock"
+        role="group"
+        tabindex="-1"
+      >
+        <button
+          class="pl-media-player-play btn btn-outline-secondary btn-sm"
+          type="button"
+          aria-label="Play"
+          aria-describedby="pl-media-player-status-{{dom_id}}"
+        >
+          Play
+        </button>
+        <span
+          class="pl-media-player-tooltip pl-media-player-play-tooltip"
+          id="pl-media-player-play-tooltip-{{dom_id}}"
+          role="tooltip"
+        ></span>
+      </span>
+      <span
+        class="pl-media-player-control-lock pl-media-player-seek-lock"
+        role="group"
+        tabindex="-1"
+      >
+        <input
+          class="pl-media-player-seek"
+          type="range"
+          min="0"
+          max="0"
+          step="0.01"
+          value="0"
+          aria-label="Seek"
+        />
+        <span
+          class="pl-media-player-tooltip pl-media-player-seek-tooltip"
+          id="pl-media-player-seek-tooltip-{{dom_id}}"
+          role="tooltip"
+        ></span>
+      </span>
+      <span class="pl-media-player-time" aria-live="off">0:00 / 0:00</span>
+      <span
+        class="pl-media-player-control-lock pl-media-player-mute-lock"
+        role="group"
+        tabindex="-1"
+      >
+        <button
+          class="pl-media-player-mute btn btn-outline-secondary btn-sm"
+          type="button"
+          aria-label="Mute"
+        >
+          Mute
+        </button>
+        <span
+          class="pl-media-player-tooltip pl-media-player-mute-tooltip"
+          id="pl-media-player-mute-tooltip-{{dom_id}}"
+          role="tooltip"
+        ></span>
+      </span>
+      <input
+        class="pl-media-player-volume"
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        value="1"
+        aria-label="Volume"
+      />
+    </div>
+    {{#show_remaining}}
+      <p class="pl-media-player-remaining small text-muted mb-1" aria-live="polite">
+      </p>
+    {{/show_remaining}}
+    <p
+      class="pl-media-player-status small text-danger mb-0"
+      id="pl-media-player-status-{{dom_id}}"
+      aria-live="polite"
+    >
     </p>
-  {{/show_remaining}}
-  <p
-    class="pl-media-player-status small mb-0"
-    id="pl-media-player-status-{{dom_id}}"
-    aria-live="polite"
-  >
-  </p>
+  {{/youtube}}
 </div>

@@ -105,6 +105,80 @@ def test_explicit_course_file_uses_course_root_and_url(data):
     assert "<video" in output
 
 
+def test_external_url_is_preserved_and_rendered(data):
+    html = (
+        '<pl-media-player url="https://cdn.example.test/media/clip.mp3?token=a%20b&amp;v=2">'
+        "</pl-media-player>"
+    )
+
+    prepare(html, data)
+    output = render(html, data)
+    document = media_player.lxml.html.fragment_fromstring(output)
+    source = document.xpath(".//source")[0]
+
+    assert data["params"][media_player.PARAMS_KEY]["auto-1"] == {
+        "media_type": "audio",
+        "url": "https://cdn.example.test/media/clip.mp3?token=a%20b&v=2",
+    }
+    assert source.attrib == {
+        "src": "https://cdn.example.test/media/clip.mp3?token=a%20b&v=2",
+        "type": "audio/mpeg",
+    }
+    assert "<audio" in output
+
+
+def test_extensionless_external_url_uses_explicit_media_type(data):
+    html = (
+        '<pl-media-player url="https://media.example.test/playback?id=example" '
+        'media-type="video"></pl-media-player>'
+    )
+
+    prepare(html, data)
+    output = render(html, data)
+    document = media_player.lxml.html.fragment_fromstring(output)
+    source = document.xpath(".//source")[0]
+
+    assert source.attrib == {"src": "https://media.example.test/playback?id=example"}
+    assert "<video" in output
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.youtube.com/watch?v=VIDEO_ID",
+        "https://youtu.be/VIDEO_ID?t=43",
+        "https://m.youtube.com/shorts/VIDEO_ID",
+        "https://www.youtube.com/live/VIDEO_ID",
+        "https://www.youtube-nocookie.com/embed/VIDEO_ID",
+    ],
+)
+def test_youtube_urls_render_as_embed_iframes(data, url):
+    html = f'<pl-media-player url="{url}"></pl-media-player>'
+
+    prepare(html, data)
+    output = render(html, data)
+    document = media_player.lxml.html.fragment_fromstring(output)
+    iframe = document.xpath(".//iframe")[0]
+
+    assert data["params"][media_player.PARAMS_KEY]["auto-1"] == {
+        "youtube_embed_url": "https://www.youtube.com/embed/VIDEO_ID"
+    }
+    assert iframe.attrib == {
+        "allow": "accelerometer; autoplay; clipboard-write; encrypted-media; "
+        "gyroscope; picture-in-picture; web-share",
+        "allowfullscreen": "",
+        "class": "pl-media-player-youtube",
+        "frameborder": "0",
+        "height": "315",
+        "referrerpolicy": "strict-origin-when-cross-origin",
+        "src": "https://www.youtube.com/embed/VIDEO_ID",
+        "title": "YouTube video player",
+        "width": "560",
+    }
+    assert not document.xpath(".//audio | .//video | .//source")
+    assert not document.xpath(".//div[contains(@class, 'pl-media-player-controls')]")
+
+
 def test_directory_discovery_filters_extensions_and_persists_selection(data):
     write_media(data, "clips/a.wav")
     write_media(data, "clips/b.mp3")
@@ -223,6 +297,33 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
             '<pl-media-player source-directory="clips" randomize="true" '
             'media-type="audio" extensions="mp4"></pl-media-player>',
             "Unsupported extensions",
+        ),
+        (
+            '<pl-media-player url="ftp://media.example.test/clip.mp3"></pl-media-player>',
+            "absolute HTTP",
+        ),
+        (
+            '<pl-media-player url="https://media.example.test/playback"></pl-media-player>',
+            "Cannot infer the media type",
+        ),
+        (
+            '<pl-media-player url="https://media.example.test/clip.mp4" '
+            'media-type="audio"></pl-media-player>',
+            "not audio media",
+        ),
+        (
+            '<pl-media-player file-name="clip.wav" '
+            'url="https://media.example.test/clip.wav"></pl-media-player>',
+            "cannot be combined",
+        ),
+        (
+            '<pl-media-player url="https://www.youtube.com/watch?v=VIDEO_ID" '
+            'max-plays="2"></pl-media-player>',
+            "YouTube url cannot be combined",
+        ),
+        (
+            '<pl-media-player url="https://www.youtube.com/watch"></pl-media-player>',
+            "YouTube url must identify a video",
         ),
     ],
 )
