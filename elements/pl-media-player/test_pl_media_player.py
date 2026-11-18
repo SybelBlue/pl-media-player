@@ -374,6 +374,30 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
     }
 
 
+def test_playback_warning_is_red_and_inline_before_remaining_count(data):
+    write_media(data, "clip.wav")
+    html = (
+        '<pl-media-player file-name="clip.wav" max-plays="1" '
+        'allow-pause="false"></pl-media-player>'
+    )
+
+    prepare(html, data)
+    document = media_player.lxml.html.fragment_fromstring(render(html, data))
+    warning = document.xpath(
+        ".//span[contains(concat(' ', normalize-space(@class), ' '), "
+        "' pl-media-player-playback-warning ')]"
+    )[0]
+    remaining = document.xpath(
+        ".//span[contains(concat(' ', normalize-space(@class), ' '), "
+        "' pl-media-player-remaining ')]"
+    )[0]
+
+    assert "text-danger" in warning.classes
+    assert "hidden" in warning.attrib
+    assert warning.getparent() is remaining.getparent()
+    assert warning.getnext() is remaining
+
+
 def test_playback_count_is_restored_from_submission_and_excluded_from_answers(data):
     write_media(data, "clip.wav")
     html = (

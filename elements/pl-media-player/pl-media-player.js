@@ -125,6 +125,7 @@
       this.$muteTooltip = this.$container.find('.pl-media-player-mute-tooltip').first();
       this.$volume = this.$container.find('.pl-media-player-volume').first();
       this.$playbackCount = this.$container.find('.pl-media-player-playback-count').first();
+      this.$playbackWarning = this.$container.find('.pl-media-player-playback-warning').first();
       this.$remaining = this.$container.find('.pl-media-player-remaining').first();
       this.$status = this.$container.find('.pl-media-player-status').first();
       this.storage = this.#browserStorage();
@@ -353,9 +354,10 @@
         !inactiveAndExhausted &&
         !this.config.allowPause &&
         this.budget.remaining === 1;
-      if (finalUnpausableAttempt && !this.$status.text()) {
-        this.#setStatus('This is your last playback attempt. Once started, it cannot be paused.');
-      }
+      this.$playbackWarning.prop('hidden', !finalUnpausableAttempt);
+      this.$playbackWarning.text(
+        finalUnpausableAttempt ? 'Playback cannot be stopped once started.' : '',
+      );
     }
 
     #togglePlayback() {

@@ -91,6 +91,12 @@ class FakeContainer extends FakeElement {
     this.volume = new FakeElement();
     this.playbackCount = new FakeElement();
     this.playbackCount.value = '0';
+    this.playbackWarning = new FakeElement();
+    this.playbackWarning.hidden = true;
+    this.playbackWarning.setAttribute(
+      'class',
+      'pl-media-player-playback-warning small text-danger mb-1',
+    );
     this.remaining = new FakeElement();
     this.status = new FakeElement();
     this.setAttribute('data-pl-media-player-config', JSON.stringify(config));
@@ -111,6 +117,7 @@ class FakeContainer extends FakeElement {
     if (selector === '.pl-media-player-mute-tooltip') return [this.muteTooltip];
     if (selector === '.pl-media-player-volume') return [this.volume];
     if (selector === '.pl-media-player-playback-count') return [this.playbackCount];
+    if (selector === '.pl-media-player-playback-warning') return [this.playbackWarning];
     if (selector === '.pl-media-player-remaining') return [this.remaining];
     if (selector === '.pl-media-player-status') return [this.status];
     return [];
@@ -373,8 +380,10 @@ test('a final unpausable attempt is red and warned about before playback', () =>
   assert.equal(player.playButton.getAttribute('data-warning'), 'true');
   assert.match(player.playButton.getAttribute('class'), /\bbtn-danger\b/);
   assert.doesNotMatch(player.playButton.getAttribute('class'), /\bbtn-outline-secondary\b/);
-  assert.match(player.status.textContent, /last playback attempt/i);
-  assert.match(player.status.textContent, /cannot be paused/i);
+  assert.equal(player.playbackWarning.hidden, false);
+  assert.equal(player.playbackWarning.textContent, 'Playback cannot be stopped once started.');
+  assert.match(player.playbackWarning.getAttribute('class'), /\btext-danger\b/);
+  assert.equal(player.status.textContent, '');
 
   player.media.emit('playing');
 
@@ -382,6 +391,8 @@ test('a final unpausable attempt is red and warned about before playback', () =>
   assert.equal(player.playButton.getAttribute('data-warning'), 'false');
   assert.doesNotMatch(player.playButton.getAttribute('class'), /\bbtn-danger\b/);
   assert.match(player.playButton.getAttribute('class'), /\bbtn-outline-secondary\b/);
+  assert.equal(player.playbackWarning.hidden, true);
+  assert.equal(player.playbackWarning.textContent, '');
   assert.equal(player.status.textContent, '');
 });
 
@@ -398,7 +409,9 @@ test('the warning appears when a later playback becomes the final unpausable att
 
   assert.equal(player.playButton.disabled, false);
   assert.equal(player.playButton.getAttribute('data-warning'), 'true');
-  assert.match(player.status.textContent, /last playback attempt/i);
+  assert.equal(player.playbackWarning.hidden, false);
+  assert.equal(player.playbackWarning.textContent, 'Playback cannot be stopped once started.');
+  assert.equal(player.status.textContent, '');
 });
 
 test('enabled custom controls play, pause, seek, mute, and adjust volume', () => {
