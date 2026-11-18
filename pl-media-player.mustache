@@ -106,10 +106,12 @@
         aria-label="Volume"
       />
     </div>
-    {{#show_remaining}}
-      <p class="pl-media-player-remaining small text-muted mb-1" aria-live="polite">
-      </p>
-    {{/show_remaining}}
+    <p class="pl-media-player-playback-message small mb-1" aria-live="polite">
+      <span class="pl-media-player-playback-warning text-danger" hidden></span>
+      {{#show_remaining}}
+        <span class="pl-media-player-remaining text-muted"></span>
+      {{/show_remaining}}
+    </p>
     <p
       class="pl-media-player-status small text-danger mb-0"
       id="pl-media-player-status-{{dom_id}}"
