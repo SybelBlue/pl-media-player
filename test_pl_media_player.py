@@ -54,6 +54,10 @@ def render(html: str, data, index: int = 0) -> str:
     return media_player._render_with_index(html, data, index)
 
 
+def parse(html: str, data, index: int = 0) -> None:
+    media_player._parse_with_index(html, data, index)
+
+
 def test_config_is_frozen_portable_and_validated():
     element = media_player._element(
         '<pl-media-player file-name="clip.wav" max-plays="2" '
@@ -368,6 +372,36 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
         "showRemaining": True,
         "variantId": "99",
     }
+
+
+def test_playback_count_is_restored_from_submission_and_excluded_from_answers(data):
+    write_media(data, "clip.wav")
+    html = (
+        '<pl-media-player file-name="clip.wav" player-id="prompt" '
+        'max-plays="2"></pl-media-player>'
+    )
+    count_name = f"{media_player.PLAYBACK_COUNT_NAME_PREFIX}prompt"
+    data["raw_submitted_answers"] = {count_name: "1"}
+    data["submitted_answers"] = {count_name: "1", "answer": "kept"}
+
+    prepare(html, data)
+    output = render(html, data)
+    document = media_player.lxml.html.fragment_fromstring(output)
+    count_input = document.xpath(
+        ".//input[contains(@class, 'pl-media-player-playback-count')]"
+    )[0]
+
+    assert count_input.attrib == {
+        "class": "pl-media-player-playback-count",
+        "data-skip-unload-check": "true",
+        "name": count_name,
+        "type": "hidden",
+        "value": "1",
+    }
+
+    parse(html, data)
+    assert data["submitted_answers"] == {"answer": "kept"}
+    assert data["raw_submitted_answers"] == {count_name: "1"}
 
 
 @pytest.mark.parametrize(

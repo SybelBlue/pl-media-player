@@ -124,6 +124,7 @@
       this.$muteButton = this.$container.find('.pl-media-player-mute').first();
       this.$muteTooltip = this.$container.find('.pl-media-player-mute-tooltip').first();
       this.$volume = this.$container.find('.pl-media-player-volume').first();
+      this.$playbackCount = this.$container.find('.pl-media-player-playback-count').first();
       this.$remaining = this.$container.find('.pl-media-player-remaining').first();
       this.$status = this.$container.find('.pl-media-player-status').first();
       this.storage = this.#browserStorage();
@@ -136,8 +137,11 @@
       this.internalPause = false;
       this.internalSeek = false;
 
+      const submitted = Number(this.$playbackCount.val());
+      const submittedPlays = Number.isInteger(submitted) && submitted >= 0 ? submitted : 0;
       const persisted = config.persist ? this.#readPersistedPlays() : 0;
-      this.budget = new PlaybackBudget(config.maxPlays, persisted);
+      this.budget = new PlaybackBudget(config.maxPlays, Math.max(submittedPlays, persisted));
+      this.$playbackCount.val(String(this.budget.playsUsed));
 
       if (!this.media) return;
       this.media.controls = false;
@@ -176,6 +180,7 @@
     }
 
     #persist() {
+      this.$playbackCount.val(String(this.budget.playsUsed));
       if (!this.config.persist || !this.storage) return;
       try {
         this.storage.setItem(
