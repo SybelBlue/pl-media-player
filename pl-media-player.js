@@ -1,12 +1,15 @@
 (($) => {
   'use strict';
 
-  const PLAYBACK_CONFLICT_MESSAGE =
-    'Another media player is playing and cannot be interrupted.';
+  const PLAYBACK_CONFLICT_MESSAGE = 'Another media player is playing and cannot be interrupted.';
   const PAGE_INSTANCE_STATE_KEY = 'plMediaPlayerPageInstanceId';
   const VOLUME_STORAGE_KEY = 'pl-media-player:volume:v1';
+  const TEST_TONE_LEVELS = [0.08, 0.16, 0.32];
+  const TEST_TONE_DURATION = 0.2;
+  const TEST_TONE_GAP = 0.08;
   const volumePreferenceManagers = new WeakMap();
   let transientVolumePreferenceManager = null;
+  let testSoundAudioContext = null;
 
   function createPageInstanceId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -156,8 +159,7 @@
           other !== controller &&
           other.media.paused === false &&
           !other.media.ended &&
-          (!controller.config.allowOverlappingPlayback ||
-            !other.config.allowOverlappingPlayback),
+          (!controller.config.allowOverlappingPlayback || !other.config.allowOverlappingPlayback),
       );
       if (conflicts.some((other) => !other.config.allowPause)) return false;
       for (const other of conflicts) other.pauseForAnotherPlayer();
@@ -209,6 +211,11 @@
       this.$seek = this.$container.find('.pl-media-player-seek').first();
       this.$seekTooltip = this.$container.find('.pl-media-player-seek-tooltip').first();
       this.$time = this.$container.find('.pl-media-player-time').first();
+      this.$audioButtons = this.$container.find('.pl-media-player-audio-buttons').first();
+      this.$testSoundControl = this.$container
+        .find('.pl-media-player-test-sound-control')
+        .first();
+      this.$testSoundButton = this.$container.find('.pl-media-player-test-sound').first();
       this.$muteLock = this.$container.find('.pl-media-player-mute-lock').first();
       this.$muteButton = this.$container.find('.pl-media-player-mute').first();
       this.$muteTooltip = this.$container.find('.pl-media-player-mute-tooltip').first();
@@ -218,8 +225,7 @@
       this.$remaining = this.$container.find('.pl-media-player-remaining').first();
       this.$status = this.$container.find('.pl-media-player-status').first();
       this.storage = this.#browserStorage();
-      this.playbackStorageKey =
-        `pl-media-player:v2:${pageInstanceId(config.variantId)}:${config.playerId}`;
+      this.playbackStorageKey = `pl-media-player:v2:${pageInstanceId(config.variantId)}:${config.playerId}`;
       this.volumePreferenceManager = volumePreferenceManager(this.storage);
       this.lastAllowedTime = 0;
       this.lastAudibleVolume = 1;
@@ -227,14 +233,13 @@
       this.lastAppliedMuted = null;
       this.internalPause = false;
       this.internalSeek = false;
+      this.loading = Boolean(config.externalAudio && this.media?.readyState < 1);
+      this.testSoundPlaying = false;
 
       const submitted = Number(this.$playbackCount.val());
       const submittedPlays = Number.isInteger(submitted) && submitted >= 0 ? submitted : 0;
       const persistedPlays = this.#readPersistedPlays();
-      this.budget = new PlaybackBudget(
-        config.maxPlays,
-        Math.max(submittedPlays, persistedPlays),
-      );
+      this.budget = new PlaybackBudget(config.maxPlays, Math.max(submittedPlays, persistedPlays));
       this.$playbackCount.val(String(this.budget.playsUsed));
       // A submitted input can be newer than local storage, for example when storage was
       // previously unavailable. Keep both recovery paths at the highest observed count.
@@ -299,11 +304,14 @@
 
     #bind() {
       this.$media.on({
+        loadstart: () => this.#setLoading(true),
         play: () => this.#onPlay(),
         playing: () => this.#onPlaying(),
         pause: () => this.#onPause(),
         ended: () => this.#onEnded(),
-        loadedmetadata: () => this.#renderProgress(),
+        loadedmetadata: () => this.#setLoading(false),
+        canplay: () => this.#setLoading(false),
+        waiting: () => this.#setLoading(true),
         durationchange: () => this.#renderProgress(),
         timeupdate: () => this.#onTimeUpdate(),
         seeking: () => this.#onSeeking(),
@@ -312,6 +320,7 @@
       });
       this.$playButton.on('click', () => this.#togglePlayback());
       this.$seek.on('input', () => this.#onSeekInput());
+      this.$testSoundButton.on('click', () => this.#playTestSound());
       this.$muteButton.on('click', () => this.#toggleMuted());
       this.$volume.on('input', () => this.#onVolumeInput());
       this.#bindLockout(this.$playLock);
@@ -340,6 +349,15 @@
 
     #setStatus(message) {
       this.$status.text(message);
+    }
+
+    #setLoading(loading) {
+      if (!this.config.externalAudio || this.loading === loading) {
+        if (!loading) this.#renderProgress();
+        return;
+      }
+      this.loading = loading;
+      this.#renderState();
     }
 
     #bindLockout($lock) {
@@ -404,8 +422,9 @@
         this.budget.remaining === 1;
       const playMessage = inactiveAndExhausted ? 'No plays left.' : 'Pausing disabled.';
       this.$playButton
-        .attr('data-icon', isPlaying ? 'pause' : 'play')
-        .attr('aria-label', playLabel);
+        .attr('data-icon', this.loading ? 'loading' : isPlaying ? 'pause' : 'play')
+        .attr('aria-label', playLabel)
+        .attr('aria-busy', String(this.loading));
       this.$playButton.attr('data-warning', String(finalUnpausableAttempt));
       this.$playButton.toggleClass('btn-danger', finalUnpausableAttempt);
       this.$playButton.toggleClass('btn-outline-secondary', !finalUnpausableAttempt);
@@ -490,9 +509,11 @@
         this.#renderState();
         return;
       }
+      this.#setLoading(true);
       const started = this.media.play();
       if (started && typeof started.catch === 'function') {
         started.catch(() => {
+          this.#setLoading(false);
           this.#setStatus('Could not start playback.');
           this.#renderState();
         });
@@ -506,6 +527,73 @@
       }
       const nextTime = Number(this.$seek.val());
       if (Number.isFinite(nextTime)) this.media.currentTime = nextTime;
+    }
+
+    async #playTestSound() {
+      if (this.testSoundPlaying) return;
+      const AudioContextClass = globalThis.AudioContext ?? globalThis.webkitAudioContext;
+      if (!AudioContextClass) {
+        this.#hideTestSound('pl-media-player test sound is not supported in this browser.');
+        return;
+      }
+
+      this.testSoundPlaying = true;
+      this.$testSoundButton.prop('disabled', true);
+      let oscillator = null;
+      let gain = null;
+      try {
+        if (!testSoundAudioContext || testSoundAudioContext.state === 'closed') {
+          testSoundAudioContext = new AudioContextClass();
+        }
+        if (testSoundAudioContext.state === 'suspended') {
+          await testSoundAudioContext.resume();
+        }
+
+        oscillator = testSoundAudioContext.createOscillator();
+        gain = testSoundAudioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 440;
+        oscillator.connect(gain);
+        gain.connect(testSoundAudioContext.destination);
+
+        const volume = this.media.muted ? 0 : this.media.volume;
+        const startTime = testSoundAudioContext.currentTime;
+        for (const [index, level] of TEST_TONE_LEVELS.entries()) {
+          const toneStart = startTime + index * (TEST_TONE_DURATION + TEST_TONE_GAP);
+          const toneEnd = toneStart + TEST_TONE_DURATION;
+          const toneVolume = level * volume;
+          gain.gain.setValueAtTime(0, toneStart);
+          gain.gain.linearRampToValueAtTime(toneVolume, toneStart + 0.015);
+          gain.gain.setValueAtTime(toneVolume, toneEnd - 0.03);
+          gain.gain.linearRampToValueAtTime(0, toneEnd);
+        }
+
+        oscillator.onended = () => {
+          oscillator.disconnect();
+          gain.disconnect();
+          this.testSoundPlaying = false;
+          this.$testSoundButton.prop('disabled', false);
+        };
+        oscillator.start(startTime);
+        oscillator.stop(
+          startTime +
+            TEST_TONE_LEVELS.length * TEST_TONE_DURATION +
+            (TEST_TONE_LEVELS.length - 1) * TEST_TONE_GAP,
+        );
+      } catch (error) {
+        oscillator?.disconnect();
+        gain?.disconnect();
+        this.#hideTestSound('pl-media-player could not play the test sound.', error);
+      }
+    }
+
+    #hideTestSound(message, error) {
+      this.testSoundPlaying = false;
+      this.$testSoundButton.prop('disabled', false);
+      this.$testSoundControl.prop('hidden', true);
+      this.$audioButtons.attr('data-test-sound-unavailable', 'true');
+      if (error) console.error(message, error);
+      else console.error(message);
     }
 
     #toggleMuted() {
@@ -548,10 +636,12 @@
         this.#denyPlayback(PLAYBACK_CONFLICT_MESSAGE);
         return;
       }
+      this.#setLoading(true);
       this.#renderState();
     }
 
     #onPlaying() {
+      this.#setLoading(false);
       if (!this.budget.sessionActive) {
         if (!this.budget.beginSession()) {
           this.#denyPlayback();
@@ -565,16 +655,13 @@
     }
 
     #onPause() {
+      this.#setLoading(false);
       if (this.internalPause) {
         this.internalPause = false;
         this.#renderState();
         return;
       }
-      if (
-        this.media.ended ||
-        !this.budget.sessionActive ||
-        this.config.allowPause
-      ) {
+      if (this.media.ended || !this.budget.sessionActive || this.config.allowPause) {
         this.#renderState();
         return;
       }
@@ -585,6 +672,7 @@
     }
 
     #onEnded() {
+      this.#setLoading(false);
       this.budget.endSession();
       this.#setUnloadDirty(false);
       this.lastAllowedTime = 0;
@@ -640,6 +728,7 @@
     }
 
     #onError() {
+      this.#setLoading(false);
       if (!this.budget.sessionActive) {
         this.#setStatus('Media failed to load; play not used.');
       } else {
