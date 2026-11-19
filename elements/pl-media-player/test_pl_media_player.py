@@ -60,7 +60,7 @@ def parse(html: str, data) -> None:
 def test_config_is_frozen_portable_and_validated():
     element = media_player._element(
         '<pl-media-player file-name="clip.wav" max-plays="2" '
-        'persist="variant" player-id="main"></pl-media-player>'
+        'player-id="main"></pl-media-player>'
     )
 
     config = media_player.Config.from_element(element)
@@ -71,7 +71,6 @@ def test_config_is_frozen_portable_and_validated():
         "allowPause": True,
         "allowSeeking": True,
         "maxPlays": 2,
-        "persist": True,
         "playerId": "main",
         "showRemaining": True,
         "variantId": "variant-1",
@@ -374,7 +373,7 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
     html = (
         '<pl-media-player file-name="folder name/clip.wav" player-id="prompt" '
         'max-plays="2" allow-pause="false" allow-seeking="false" '
-        'allow-overlapping-playback="true" persist="variant"></pl-media-player>'
+        'allow-overlapping-playback="true"></pl-media-player>'
     )
 
     prepare(html, data)
@@ -389,7 +388,6 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
         "allowPause": False,
         "allowSeeking": False,
         "maxPlays": 2,
-        "persist": True,
         "playerId": "prompt",
         "showRemaining": True,
         "variantId": "99",

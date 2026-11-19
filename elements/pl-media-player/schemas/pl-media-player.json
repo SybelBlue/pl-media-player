@@ -40,11 +40,6 @@
       "type": "string",
       "enum": ["auto", "audio", "video"]
     },
-    "persist": {
-      "default": "none",
-      "type": "string",
-      "enum": ["none", "variant"]
-    },
     "player-id": {
       "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
       "type": "string"

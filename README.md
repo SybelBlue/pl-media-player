@@ -17,7 +17,7 @@ distribution.
 - Origin-wide volume memory with same-page player synchronization.
 - Limit-aware muting control that prevents silent playback by default for limited players.
 - Optional remaining-attempt display and clear exhaustion feedback.
-- Optional browser-local, variant-scoped persistence.
+- Reload-safe, variant-scoped playback counts backed by browser storage and submitted inputs.
 - Explicit question-local or course-local files.
 - External media from HTTP(S) URLs, including embedded YouTube videos.
 - Manifest-free random selection from a directory during `prepare()`.
@@ -84,13 +84,12 @@ needed:
 ></pl-media-player>
 ```
 
-Variant-scoped browser persistence:
+Playback limits are automatically persisted for the PrairieLearn variant:
 
 ```html
 <pl-media-player
   file-name="conversation.mp3"
   max-plays="2"
-  persist="variant"
   player-id="listening-prompt"
 ></pl-media-player>
 ```
@@ -168,7 +167,6 @@ depend on the source course's `clientFilesCourse`.
 | `allow-pause`                | `true`                | Permit pausing and resuming the active session.                                       |
 | `allow-seeking`              | `true`                | Permit moving within the active session.                                              |
 | `show-remaining`             | `true`                | Show the remaining session count or the unlimited label.                              |
-| `persist`                    | `none`                | `none` or browser-local `variant` persistence.                                        |
 | `media-type`                 | `auto`                | `auto`, `audio`, or `video`; required for URLs without a recognized extension.        |
 | `extensions`                 | supported formats     | Comma-separated discovery filter; only valid with random selection.                   |
 | `player-id`                  | required              | Unique namespace for submitted playback state and browser-local persistence.          |
@@ -193,18 +191,19 @@ on the page. If a conflicting player has `allow-pause="false"`, the new playback
 using an attempt. Simultaneous playback is allowed only when every involved player sets
 `allow-overlapping-playback="true"`. YouTube embeds are outside this coordination.
 
-The consumed count is included in each Save or Save and Grade submission, so rendering the saved
-submission does not reset the playback budget.
+The consumed count is written to both a submitted hidden input and variant-scoped browser storage.
+On initialization, the greater of those counts wins. The input carries progress through Save and
+Save and Grade, while browser storage covers reload, back/forward navigation, tab close, and other
+unloads that do not submit the form. Storage keys contain PrairieLearn's `variant_id` and the stable
+player identity, so different variants and players remain independent. If local storage is
+unavailable, the input still carries progress through submissions and playback continues with
+in-memory limits without an uncaught error.
 
-With `persist="variant"`, the consumed count is saved under a key containing PrairieLearn's
-`variant_id` and the stable player identity. Reloading during a session does not refund the attempt.
-If local storage is unavailable, playback continues with in-memory limits and no uncaught error.
-
-Volume is saved independently of `persist` as a learner preference shared by all
-`pl-media-player` instances on the same origin. A change updates other players already initialized
-on the page and is restored on later page loads. Numeric volume is remembered, including zero, but
-the native muted state is not. When a player disallows muting, it uses the last positive saved
-volume instead of a saved zero without erasing the zero-volume preference for unrestricted players.
+Volume is saved as a learner preference shared by all `pl-media-player` instances on the same
+origin. A change updates other players already initialized on the page and is restored on later page
+loads. Numeric volume is remembered, including zero, but the native muted state is not. When a
+player disallows muting, it uses the last positive saved volume instead of a saved zero without
+erasing the zero-volume preference for unrestricted players.
 
 `allow-muting="auto"` allows muting for unlimited playback and prevents it when `max-plays` is set;
 explicit `true` and `false` values override that rule. Prevention covers both the muted state and
@@ -248,7 +247,7 @@ def generate(data):
 <pl-string-input answers-name="direction"></pl-string-input>
 ```
 
-The demonstration course includes both selection patterns, multiple players, a persisted player,
+The demonstration course includes both selection patterns, multiple players, a reload-safe player,
 basic and limited videos, direct external audio, a YouTube embed, and a representative
 language-listening question. Local-media demos keep their files in their own `clientFilesQuestion`
 directories so they remain copyable through PrairieLearn content sharing.

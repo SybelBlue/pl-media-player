@@ -277,7 +277,6 @@ function config(overrides = {}) {
     allowPause: true,
     allowSeeking: true,
     maxPlays: 2,
-    persist: false,
     playerId: 'main',
     showRemaining: true,
     variantId: '101',
@@ -640,41 +639,54 @@ test('seeking can be prohibited or permitted', () => {
   assert.equal(permitted.media.currentTime, 10);
 });
 
-test('persisted counts survive reload while a new variant is independent', () => {
+test('counts survive every reload by default while a new variant is independent', () => {
   const storage = new MemoryStorage();
-  const first = container({ persist: true, variantId: 'first' });
+  const first = container({ variantId: 'first' });
   loadPlayers([first], storage);
   first.media.emit('playing');
 
-  const reloaded = container({ persist: true, variantId: 'first' });
+  assert.equal(first.playbackCount.value, '1');
+  assert.deepEqual(JSON.parse(storage.getItem(playbackKey({ variantId: 'first' }))), {
+    playsUsed: 1,
+  });
+
+  const reloaded = container({ variantId: 'first' });
   loadPlayers([reloaded], storage);
   assert.equal(reloaded.remaining.textContent, '1 play left.');
+  assert.equal(reloaded.playbackCount.value, '1');
 
-  const nextVariant = container({ persist: true, variantId: 'second' });
+  const nextVariant = container({ variantId: 'second' });
   loadPlayers([nextVariant], storage);
   assert.equal(nextVariant.remaining.textContent, '2 plays left.');
 });
 
-test('submitted playback count survives Save and Grade without browser persistence', () => {
-  const first = container();
-  loadPlayers([first]);
-  first.media.emit('playing');
+test('submitted playback input seeds and advances browser persistence', () => {
+  const storage = new MemoryStorage();
+  const player = container({}, 1);
+  loadPlayers([player], storage);
 
-  assert.equal(first.playbackCount.value, '1');
+  assert.deepEqual(JSON.parse(storage.getItem(playbackKey())), { playsUsed: 1 });
 
-  const rerendered = container({}, first.playbackCount.value);
-  loadPlayers([rerendered]);
+  player.media.emit('playing');
+  assert.equal(player.playbackCount.value, '2');
+  assert.deepEqual(JSON.parse(storage.getItem(playbackKey())), { playsUsed: 2 });
+  assert.equal(player.remaining.textContent, 'No plays left.');
+});
 
-  assert.equal(rerendered.remaining.textContent, '1 play left.');
-  rerendered.media.emit('playing');
-  assert.equal(rerendered.playbackCount.value, '2');
-  assert.equal(rerendered.remaining.textContent, 'No plays left.');
+test('browser persistence restores a count when the rendered input is stale', () => {
+  const storage = new MemoryStorage();
+  storage.setItem(playbackKey(), JSON.stringify({ playsUsed: 1 }));
+  const player = container({}, 0);
+  loadPlayers([player], storage);
+
+  assert.equal(player.playbackCount.value, '1');
+  assert.equal(player.remaining.textContent, '1 play left.');
 });
 
 test('multiple players use independent storage keys', () => {
   const storage = new MemoryStorage();
-  const first = container({ persist: true, playerId: 'first' });
-  const second = container({ persist: true, playerId: 'second' });
+  const first = container({ playerId: 'first' });
+  const second = container({ playerId: 'second' });
   loadPlayers([first, second], storage);
 
   first.media.emit('playing');
@@ -684,7 +696,7 @@ test('multiple players use independent storage keys', () => {
   assert.equal(storage.values.size, 1);
 });
 
-test('volume is cached across variants without playback persistence', () => {
+test('volume is cached across variants independently of playback persistence', () => {
   const storage = new MemoryStorage();
   const first = container({ variantId: 'first' });
   loadPlayers([first], storage);
@@ -778,11 +790,11 @@ test('invalid cached volume is ignored and a missing audible value is repaired',
 
 test('a loading failure before playing consumes no attempt', () => {
   const storage = new MemoryStorage();
-  const player = container({ persist: true });
+  const player = container();
   loadPlayers([player], storage);
   player.media.emit('error');
 
-  assert.equal(storage.getItem(playbackKey({ persist: true })), null);
+  assert.equal(storage.getItem(playbackKey()), null);
   assert.equal(player.status.textContent, 'Media failed to load; play not used.');
 });
 
@@ -795,7 +807,7 @@ test('blocked localStorage does not crash playback', () => {
       throw new Error('blocked');
     },
   };
-  const player = container({ persist: true });
+  const player = container();
   assert.doesNotThrow(() => loadPlayers([player], storage));
 
   assert.doesNotThrow(() => player.media.emit('playing'));

@@ -1,6 +1,6 @@
 {
   "uuid": "3c443dcf-d7c7-4dfb-aef8-7175ca354a00",
-  "title": "Variant-scoped persistence",
+  "title": "Reload-safe playback counts",
   "topic": "Media Player",
   "type": "v3",
   "tags": ["Demo"],
