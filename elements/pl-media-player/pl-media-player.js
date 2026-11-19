@@ -3,9 +3,70 @@
 
   const PLAYBACK_CONFLICT_MESSAGE =
     'Another media player is playing and cannot be interrupted.';
+  const PAGE_INSTANCE_STATE_KEY = 'plMediaPlayerPageInstanceId';
   const VOLUME_STORAGE_KEY = 'pl-media-player:volume:v1';
   const volumePreferenceManagers = new WeakMap();
   let transientVolumePreferenceManager = null;
+
+  function createPageInstanceId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function pageInstanceId(variantId) {
+    try {
+      const state = history.state;
+      if (
+        state !== null &&
+        typeof state === 'object' &&
+        !Array.isArray(state) &&
+        typeof state[PAGE_INSTANCE_STATE_KEY] === 'string'
+      ) {
+        return state[PAGE_INSTANCE_STATE_KEY];
+      }
+
+      // Do not replace a non-object state owned by the host application.
+      if (state !== null && (typeof state !== 'object' || Array.isArray(state))) {
+        return `variant:${variantId}`;
+      }
+
+      const id = createPageInstanceId();
+      history.replaceState({ ...state, [PAGE_INSTANCE_STATE_KEY]: id }, '');
+      return id;
+    } catch {
+      // History can be unavailable in embedded or privacy-restricted contexts.
+      return `variant:${variantId}`;
+    }
+  }
+
+  function bindPageInstanceReset() {
+    if (typeof document === 'undefined') return;
+    document.addEventListener(
+      'click',
+      (event) => {
+        if (!event.target.closest?.('.js-new-variant-button')) return;
+        try {
+          const state = history.state;
+          if (
+            state === null ||
+            typeof state !== 'object' ||
+            Array.isArray(state) ||
+            typeof state[PAGE_INSTANCE_STATE_KEY] !== 'string'
+          ) {
+            return;
+          }
+          const nextState = { ...state };
+          delete nextState[PAGE_INSTANCE_STATE_KEY];
+          history.replaceState(nextState, '');
+        } catch {
+          // A new variant can still load when history state is unavailable.
+        }
+      },
+      { capture: true },
+    );
+  }
 
   function isVolume(value) {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
@@ -157,7 +218,8 @@
       this.$remaining = this.$container.find('.pl-media-player-remaining').first();
       this.$status = this.$container.find('.pl-media-player-status').first();
       this.storage = this.#browserStorage();
-      this.playbackStorageKey = `pl-media-player:v1:${config.variantId}:${config.playerId}`;
+      this.playbackStorageKey =
+        `pl-media-player:v2:${pageInstanceId(config.variantId)}:${config.playerId}`;
       this.volumePreferenceManager = volumePreferenceManager(this.storage);
       this.lastAllowedTime = 0;
       this.lastAudibleVolume = 1;
@@ -386,6 +448,8 @@
       if (this.config.showRemaining) {
         const remaining = this.budget.remaining;
         this.$remaining.prop('hidden', remaining === null);
+        this.$remaining.toggleClass('text-danger', remaining === 1);
+        this.$remaining.toggleClass('text-muted', remaining !== 1);
         this.$remaining.text(
           remaining === null
             ? ''
@@ -587,6 +651,7 @@
 
   // initialize on load
   $(() => {
+    bindPageInstanceReset();
     $('[data-pl-media-player-config]').each((_index, container) => {
       const $container = $(container);
       if ($container.data('pl-media-player-initialized')) return;

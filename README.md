@@ -17,7 +17,7 @@ distribution.
 - Origin-wide volume memory with same-page player synchronization.
 - Limit-aware muting control that prevents silent playback by default for limited players.
 - Optional remaining-attempt display and clear exhaustion feedback.
-- Reload-safe, variant-scoped playback counts backed by browser storage and submitted inputs.
+- Reload-safe playback counts backed by browser storage and submitted inputs.
 - Explicit question-local or course-local files.
 - External media from HTTP(S) URLs, including embedded YouTube videos.
 - Manifest-free random selection from a directory during `prepare()`.
@@ -84,7 +84,7 @@ needed:
 ></pl-media-player>
 ```
 
-Playback limits are automatically persisted for the PrairieLearn variant:
+Playback limits are automatically persisted across reloads of the current question page:
 
 ```html
 <pl-media-player
@@ -191,13 +191,14 @@ on the page. If a conflicting player has `allow-pause="false"`, the new playback
 using an attempt. Simultaneous playback is allowed only when every involved player sets
 `allow-overlapping-playback="true"`. YouTube embeds are outside this coordination.
 
-The consumed count is written to both a submitted hidden input and variant-scoped browser storage.
-On initialization, the greater of those counts wins. The input carries progress through Save and
-Save and Grade, while browser storage covers reload, back/forward navigation, tab close, and other
-unloads that do not submit the form. Storage keys contain PrairieLearn's `variant_id` and the stable
-player identity, so different variants and players remain independent. If local storage is
-unavailable, the input still carries progress through submissions and playback continues with
-in-memory limits without an uncaught error.
+The consumed count is written to both a submitted hidden input and browser storage. On
+initialization, the greater of those counts wins. The input carries progress through Save and Save
+and Grade, while browser storage covers reload, back/forward navigation, tab close, and other
+unloads that do not submit the form. Storage keys contain a browser history-entry identity and the
+stable player identity. The history identity survives reload even when PrairieLearn's instructor
+preview creates a new server variant, while an explicit New variant navigation starts with a fresh
+identity and budget. If local storage is unavailable, the input still carries progress through
+submissions and playback continues with in-memory limits without an uncaught error.
 
 Volume is saved as a learner preference shared by all `pl-media-player` instances on the same
 origin. A change updates other players already initialized on the page and is restored on later page

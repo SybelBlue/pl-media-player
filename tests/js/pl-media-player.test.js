@@ -102,6 +102,7 @@ class FakeContainer extends FakeElement {
     this.playbackWarning.hidden = true;
     this.playbackWarning.setAttribute('class', 'pl-media-player-playback-warning text-danger');
     this.remaining = new FakeElement();
+    this.remaining.setAttribute('class', 'pl-media-player-remaining text-muted');
     this.status = new FakeElement();
     this.setAttribute('data-pl-media-player-config', JSON.stringify(config));
   }
@@ -139,6 +140,32 @@ class MemoryStorage {
 
   setItem(key, value) {
     this.values.set(key, value);
+  }
+}
+
+class MemoryHistory {
+  constructor(state = null) {
+    this.state = state;
+  }
+
+  replaceState(state) {
+    this.state = state;
+  }
+}
+
+class FakeDocument {
+  constructor() {
+    this.listeners = new Map();
+  }
+
+  addEventListener(name, listener) {
+    const listeners = this.listeners.get(name) ?? [];
+    listeners.push(listener);
+    this.listeners.set(name, listeners);
+  }
+
+  click(target) {
+    for (const listener of this.listeners.get('click') ?? []) listener({ target });
   }
 }
 
@@ -290,9 +317,16 @@ function container(overrides = {}, playsUsed = 0) {
   return player;
 }
 
-function loadPlayers(containers, storage = new MemoryStorage()) {
+function loadPlayers(
+  containers,
+  storage = new MemoryStorage(),
+  history = new MemoryHistory(),
+  document = new FakeDocument(),
+) {
   const context = {
     console,
+    document,
+    history,
     jQuery: createJQuery(containers),
     localStorage: storage,
   };
@@ -300,9 +334,9 @@ function loadPlayers(containers, storage = new MemoryStorage()) {
   return context;
 }
 
-function playbackKey(overrides = {}) {
+function playbackKey(history, overrides = {}) {
   const playerConfig = config(overrides);
-  return `pl-media-player:v1:${playerConfig.variantId}:${playerConfig.playerId}`;
+  return `pl-media-player:v2:${history.state.plMediaPlayerPageInstanceId}:${playerConfig.playerId}`;
 }
 
 test('all lockout popups use Bootstrap utility styling', () => {
@@ -323,12 +357,18 @@ test('initial playback consumes one attempt and pause/resume does not consume an
   const player = container();
   loadPlayers([player]);
 
+  assert.match(player.remaining.getAttribute('class'), /\btext-muted\b/);
+  assert.doesNotMatch(player.remaining.getAttribute('class'), /\btext-danger\b/);
+
   player.media.emit('playing');
   assert.equal(player.remaining.textContent, '1 play left.');
+  assert.match(player.remaining.getAttribute('class'), /\btext-danger\b/);
+  assert.doesNotMatch(player.remaining.getAttribute('class'), /\btext-muted\b/);
 
   player.media.emit('pause');
   player.media.emit('playing');
   assert.equal(player.remaining.textContent, '1 play left.');
+  assert.match(player.remaining.getAttribute('class'), /\btext-danger\b/);
 });
 
 test('an active limited playback marks the question dirty until the session ends', () => {
@@ -639,45 +679,66 @@ test('seeking can be prohibited or permitted', () => {
   assert.equal(permitted.media.currentTime, 10);
 });
 
-test('counts survive every reload by default while a new variant is independent', () => {
+test('counts survive reload when the host renders a different server variant', () => {
   const storage = new MemoryStorage();
+  const history = new MemoryHistory();
   const first = container({ variantId: 'first' });
-  loadPlayers([first], storage);
+  loadPlayers([first], storage, history);
   first.media.emit('playing');
 
   assert.equal(first.playbackCount.value, '1');
-  assert.deepEqual(JSON.parse(storage.getItem(playbackKey({ variantId: 'first' }))), {
+  assert.deepEqual(JSON.parse(storage.getItem(playbackKey(history))), {
     playsUsed: 1,
   });
 
-  const reloaded = container({ variantId: 'first' });
-  loadPlayers([reloaded], storage);
+  const reloaded = container({ variantId: 'second' });
+  loadPlayers([reloaded], storage, history);
   assert.equal(reloaded.remaining.textContent, '1 play left.');
   assert.equal(reloaded.playbackCount.value, '1');
+});
+
+test('PrairieLearn New variant navigation receives an independent playback budget', () => {
+  const storage = new MemoryStorage();
+  const history = new MemoryHistory();
+  const document = new FakeDocument();
+  const first = container({ variantId: 'first' });
+  loadPlayers([first], storage, history, document);
+  first.media.emit('playing');
+
+  const firstPageId = history.state.plMediaPlayerPageInstanceId;
+  document.click({
+    closest(selector) {
+      return selector === '.js-new-variant-button' ? this : null;
+    },
+  });
 
   const nextVariant = container({ variantId: 'second' });
-  loadPlayers([nextVariant], storage);
+  loadPlayers([nextVariant], storage, history);
   assert.equal(nextVariant.remaining.textContent, '2 plays left.');
+  assert.notEqual(firstPageId, history.state.plMediaPlayerPageInstanceId);
 });
 
 test('submitted playback input seeds and advances browser persistence', () => {
   const storage = new MemoryStorage();
+  const history = new MemoryHistory();
   const player = container({}, 1);
-  loadPlayers([player], storage);
+  loadPlayers([player], storage, history);
 
-  assert.deepEqual(JSON.parse(storage.getItem(playbackKey())), { playsUsed: 1 });
+  const key = playbackKey(history);
+  assert.deepEqual(JSON.parse(storage.getItem(key)), { playsUsed: 1 });
 
   player.media.emit('playing');
   assert.equal(player.playbackCount.value, '2');
-  assert.deepEqual(JSON.parse(storage.getItem(playbackKey())), { playsUsed: 2 });
+  assert.deepEqual(JSON.parse(storage.getItem(key)), { playsUsed: 2 });
   assert.equal(player.remaining.textContent, 'No plays left.');
 });
 
 test('browser persistence restores a count when the rendered input is stale', () => {
   const storage = new MemoryStorage();
-  storage.setItem(playbackKey(), JSON.stringify({ playsUsed: 1 }));
+  const history = new MemoryHistory({ plMediaPlayerPageInstanceId: 'existing-page' });
+  storage.setItem(playbackKey(history), JSON.stringify({ playsUsed: 1 }));
   const player = container({}, 0);
-  loadPlayers([player], storage);
+  loadPlayers([player], storage, history);
 
   assert.equal(player.playbackCount.value, '1');
   assert.equal(player.remaining.textContent, '1 play left.');
@@ -685,9 +746,10 @@ test('browser persistence restores a count when the rendered input is stale', ()
 
 test('multiple players use independent storage keys', () => {
   const storage = new MemoryStorage();
+  const history = new MemoryHistory();
   const first = container({ playerId: 'first' });
   const second = container({ playerId: 'second' });
-  loadPlayers([first, second], storage);
+  loadPlayers([first, second], storage, history);
 
   first.media.emit('playing');
 
@@ -790,11 +852,12 @@ test('invalid cached volume is ignored and a missing audible value is repaired',
 
 test('a loading failure before playing consumes no attempt', () => {
   const storage = new MemoryStorage();
+  const history = new MemoryHistory();
   const player = container();
-  loadPlayers([player], storage);
+  loadPlayers([player], storage, history);
   player.media.emit('error');
 
-  assert.equal(storage.getItem(playbackKey()), null);
+  assert.equal(storage.getItem(playbackKey(history)), null);
   assert.equal(player.status.textContent, 'Media failed to load; play not used.');
 });
 
