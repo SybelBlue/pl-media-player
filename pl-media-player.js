@@ -168,9 +168,15 @@
 
       const submitted = Number(this.$playbackCount.val());
       const submittedPlays = Number.isInteger(submitted) && submitted >= 0 ? submitted : 0;
-      const persisted = config.persist ? this.#readPersistedPlays() : 0;
-      this.budget = new PlaybackBudget(config.maxPlays, Math.max(submittedPlays, persisted));
+      const persistedPlays = this.#readPersistedPlays();
+      this.budget = new PlaybackBudget(
+        config.maxPlays,
+        Math.max(submittedPlays, persistedPlays),
+      );
       this.$playbackCount.val(String(this.budget.playsUsed));
+      // A submitted input can be newer than local storage, for example when storage was
+      // previously unavailable. Keep both recovery paths at the highest observed count.
+      if (submittedPlays > persistedPlays) this.#persist();
 
       if (!this.media) return;
       this.media.controls = false;
@@ -211,7 +217,7 @@
 
     #persist() {
       this.$playbackCount.val(String(this.budget.playsUsed));
-      if (!this.config.persist || !this.storage) return;
+      if (!this.storage) return;
       try {
         this.storage.setItem(
           this.playbackStorageKey,

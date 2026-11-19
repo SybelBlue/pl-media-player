@@ -24,11 +24,6 @@ class MediaType(Enum):
     VIDEO = "video"
 
 
-class Persist(Enum):
-    NONE = "none"
-    VARIANT = "variant"
-
-
 DIRECTORY_PATH_OPTIONS = {
     Directory.CLIENT_FILES_QUESTION: "client_files_question_path",
     Directory.CLIENT_FILES_COURSE: "client_files_course_path",
@@ -72,7 +67,6 @@ OPTIONAL_ATTRIBUTES = [
     "file-name",
     "max-plays",
     "media-type",
-    "persist",
     "randomize",
     "show-remaining",
     "source-directory",
@@ -105,17 +99,6 @@ def _media_type(element: lxml.html.HtmlElement) -> MediaType:
         choices = ", ".join(item.value for item in MediaType)
         raise ValueError(
             f'Invalid media-type "{value}"; expected one of: {choices}.'
-        ) from exc
-
-
-def _persist(element: lxml.html.HtmlElement) -> Persist:
-    value = pl.get_string_attrib(element, "persist", Persist.NONE.value)
-    try:
-        return Persist(value)
-    except ValueError as exc:
-        choices = ", ".join(item.value for item in Persist)
-        raise ValueError(
-            f'Invalid persist value "{value}"; expected one of: {choices}.'
         ) from exc
 
 
@@ -297,7 +280,6 @@ class Config:
     file_name: str | None
     max_plays: int | None
     media_type: MediaType
-    persist: Persist
     player_id: str
     randomize: bool
     show_remaining: bool
@@ -397,7 +379,6 @@ class Config:
             file_name=pl.get_string_attrib(element, "file-name", None),
             max_plays=max_plays,
             media_type=media_type,
-            persist=_persist(element),
             player_id=_player_id(element),
             randomize=pl.get_boolean_attrib(element, "randomize", False),
             show_remaining=pl.get_boolean_attrib(element, "show-remaining", True),
@@ -424,7 +405,6 @@ class Config:
             "allowPause": self.allow_pause,
             "allowSeeking": self.allow_seeking,
             "maxPlays": self.max_plays,
-            "persist": self.persist is Persist.VARIANT,
             "playerId": self.player_id,
             "showRemaining": self.show_remaining,
             "variantId": variant_id,
