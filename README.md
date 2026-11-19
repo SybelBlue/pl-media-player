@@ -37,7 +37,7 @@ generated `release` branch directly into the course element directory:
 uv add --dev pl_vendor
 uv run pl-vendor add \
   pl-media-player \
-  https://github.com/ORG/pl-media-player.git \
+  https://github.com/SybelBlue/pl-media-player.git \
   elements/pl-media-player \
   --branch release
 uv run pl-vendor check installed
@@ -156,22 +156,22 @@ depend on the source course's `clientFilesCourse`.
 
 ## Attributes
 
-| Attribute                    | Default               | Description                                                                           |
-| ---------------------------- | --------------------- | ------------------------------------------------------------------------------------- |
-| `file-name`                  | —                     | Explicit POSIX-relative path below the selected client-files root.                    |
-| `url`                        | —                     | Absolute HTTP(S) media or YouTube URL; mutually exclusive with other source options.  |
-| `directory`                  | `clientFilesQuestion` | `clientFilesQuestion` or `clientFilesCourse`.                                         |
-| `source-directory`           | —                     | Direct-child discovery directory used with `randomize="true"`.                        |
-| `randomize`                  | `false`               | Select and persist one eligible file during variant preparation.                      |
-| `max-plays`                  | unlimited             | Positive number of playback sessions allowed.                                         |
-| `allow-muting`               | `auto`                | `auto`, `true`, or `false`; auto prevents silence when playback is limited.           |
-| `allow-overlapping-playback` | `false`               | Permit simultaneous playback when every active player also opts in.                   |
-| `allow-pause`                | `true`                | Permit pausing and resuming the active session.                                       |
-| `allow-seeking`              | `true`                | Permit moving within the active session.                                              |
-| `show-remaining`             | `true`                | Show the remaining session count or the unlimited label.                              |
-| `media-type`                 | `auto`                | `auto`, `audio`, or `video`; required for URLs without a recognized extension.        |
-| `extensions`                 | supported formats     | Comma-separated discovery filter; only valid with random selection.                   |
-| `player-id`                  | required              | Unique namespace for submitted playback state and browser-local persistence.          |
+| Attribute                    | Default               | Description                                                                          |
+| ---------------------------- | --------------------- | ------------------------------------------------------------------------------------ |
+| `file-name`                  | —                     | Explicit POSIX-relative path below the selected client-files root.                   |
+| `url`                        | —                     | Absolute HTTP(S) media or YouTube URL; mutually exclusive with other source options. |
+| `directory`                  | `clientFilesQuestion` | `clientFilesQuestion` or `clientFilesCourse`.                                        |
+| `source-directory`           | —                     | Direct-child discovery directory used with `randomize="true"`.                       |
+| `randomize`                  | `false`               | Select and persist one eligible file during variant preparation.                     |
+| `max-plays`                  | unlimited             | Positive number of playback sessions allowed.                                        |
+| `allow-muting`               | `auto`                | `auto`, `true`, or `false`; auto prevents silence when playback is limited.          |
+| `allow-overlapping-playback` | `false`               | Permit simultaneous playback when every active player also opts in.                  |
+| `allow-pause`                | `true`                | Permit pausing and resuming the active session.                                      |
+| `allow-seeking`              | `true`                | Permit moving within the active session.                                             |
+| `show-remaining`             | `true`                | Show the remaining session count or the unlimited label.                             |
+| `media-type`                 | `auto`                | `auto`, `audio`, or `video`; required for URLs without a recognized extension.       |
+| `extensions`                 | supported formats     | Comma-separated discovery filter; only valid with random selection.                  |
+| `player-id`                  | required              | Unique namespace for submitted playback state and browser-local persistence.         |
 
 Supported extension families are WAV, MP3, Ogg audio, AAC/M4A, FLAC, MP4/M4V, WebM, Ogg video,
 and QuickTime MOV. Actual codec playback depends on the student's browser and operating system;
