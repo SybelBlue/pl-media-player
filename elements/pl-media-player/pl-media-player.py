@@ -526,6 +526,9 @@ def _url_path(file_name: str) -> str:
 
 
 def render(element_html: str, data: pl.QuestionData) -> str:
+    if data["panel"] != "question":
+        return ""
+
     element = _element(element_html)
     config = Config.from_element(element)
     state = data["params"].get(PARAMS_KEY, {})
@@ -556,15 +559,37 @@ def render(element_html: str, data: pl.QuestionData) -> str:
     dom_id = pl.get_uuid()
     variant_id = str(data["options"].get("variant_id", data["variant_seed"]))
     client_config = config.to_client_dict(variant_id)
+    client_config["externalAudio"] = (
+        media_type is MediaType.AUDIO and "url" in selection
+    )
+    if data["manual_grading"]:
+        client_config.update(
+            {
+                "allowMuting": True,
+                "allowOverlappingPlayback": True,
+                "allowPause": True,
+                "allowSeeking": True,
+                "maxPlays": None,
+                "showRemaining": False,
+            }
+        )
 
+    plays_used = _submitted_playback_count(data, config.player_id)
     params = {
         "audio": media_type is MediaType.AUDIO,
         "config_json": json.dumps(client_config, separators=(",", ":")),
         "dom_id": dom_id,
+        "grading_play_count": (
+            f"Student played this media {plays_used} "
+            f"{'time' if plays_used == 1 else 'times'}."
+            if data["manual_grading"] and not youtube
+            else None
+        ),
+        "limited_playback": client_config["maxPlays"] is not None,
         "mime_type": MIME_TYPES.get(extension),
         "playback_count_name": _playback_count_name(config.player_id),
-        "plays_used": _submitted_playback_count(data, config.player_id),
-        "show_remaining": config.show_remaining,
+        "plays_used": plays_used,
+        "show_remaining": client_config["showRemaining"],
         "src": src,
         "video": media_type is MediaType.VIDEO,
         "youtube": youtube,

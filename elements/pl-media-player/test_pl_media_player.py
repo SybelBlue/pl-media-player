@@ -27,6 +27,8 @@ def data(tmp_path: Path):
     return {
         "params": {},
         "variant_seed": 12345,
+        "manual_grading": False,
+        "panel": "question",
         "options": {
             "client_files_question_path": str(question_root),
             "client_files_course_path": str(course_root),
@@ -116,6 +118,8 @@ def test_external_url_is_preserved_and_rendered(data):
         "src": "https://cdn.example.test/media/clip.mp3?token=a%20b&v=2",
         "type": "audio/mpeg",
     }
+    config = json.loads(document.attrib["data-pl-media-player-config"])
+    assert config["externalAudio"] is True
     assert "<audio" in output
 
 
@@ -387,11 +391,58 @@ def test_render_configuration_uses_variant_and_stable_player_identity(data):
         "allowOverlappingPlayback": True,
         "allowPause": False,
         "allowSeeking": False,
+        "externalAudio": False,
         "maxPlays": 2,
         "playerId": "prompt",
         "showRemaining": True,
         "variantId": "99",
     }
+
+
+@pytest.mark.parametrize("panel", ["submission", "answer"])
+def test_player_only_renders_in_question_panel(data, panel):
+    write_media(data, "clip.wav")
+    html = '<pl-media-player file-name="clip.wav" player-id="panel"></pl-media-player>'
+    prepare(html, data)
+    data["panel"] = panel
+
+    assert render(html, data) == ""
+
+
+def test_player_is_unrestricted_in_manual_grading_view(data):
+    write_media(data, "clip.wav")
+    html = (
+        '<pl-media-player file-name="clip.wav" player-id="grading" max-plays="1" '
+        'allow-muting="false" allow-overlapping-playback="false" '
+        'allow-pause="false" allow-seeking="false"></pl-media-player>'
+    )
+    count_name = f"{media_player.PLAYBACK_COUNT_NAME_PREFIX}grading"
+    data["raw_submitted_answers"] = {count_name: "1"}
+    prepare(html, data)
+    data["manual_grading"] = True
+
+    document = media_player.lxml.html.fragment_fromstring(render(html, data))
+    config = json.loads(document.attrib["data-pl-media-player-config"])
+
+    assert config == {
+        "allowMuting": True,
+        "allowOverlappingPlayback": True,
+        "allowPause": True,
+        "allowSeeking": True,
+        "externalAudio": False,
+        "maxPlays": None,
+        "playerId": "grading",
+        "showRemaining": False,
+        "variantId": "99",
+    }
+    assert not document.xpath(
+        ".//button[contains(@class, 'pl-media-player-test-sound')]"
+    )
+    assert not document.xpath(".//span[contains(@class, 'pl-media-player-remaining')]")
+    grading_count = document.xpath(
+        ".//span[contains(@class, 'pl-media-player-grading-play-count')]"
+    )[0]
+    assert grading_count.text_content() == "Student played this media 1 time."
 
 
 def test_player_messages_share_one_line_below_the_controls(data):
@@ -443,7 +494,10 @@ def test_video_and_controls_render_as_one_continuous_frame(data):
 
 def test_media_buttons_render_accessible_svg_icons(data):
     write_media(data, "clip.wav")
-    html = '<pl-media-player file-name="clip.wav" player-id="icons"></pl-media-player>'
+    html = (
+        '<pl-media-player file-name="clip.wav" max-plays="2" '
+        'player-id="icons"></pl-media-player>'
+    )
 
     prepare(html, data)
     document = media_player.lxml.html.fragment_fromstring(render(html, data))
@@ -453,6 +507,9 @@ def test_media_buttons_render_accessible_svg_icons(data):
     mute_button = document.xpath(".//button[contains(@class, 'pl-media-player-mute')]")[
         0
     ]
+    test_sound_button = document.xpath(
+        ".//button[contains(@class, 'pl-media-player-test-sound')]"
+    )[0]
 
     assert play_button.text_content().strip() == ""
     assert play_button.attrib["aria-label"] == "Play"
@@ -460,6 +517,7 @@ def test_media_buttons_render_accessible_svg_icons(data):
     assert {icon.attrib["class"] for icon in play_button.xpath("./svg")} == {
         "pl-media-player-icon pl-media-player-icon-play",
         "pl-media-player-icon pl-media-player-icon-pause",
+        "pl-media-player-icon pl-media-player-icon-loading",
     }
 
     assert mute_button.text_content().strip() == ""
@@ -470,9 +528,59 @@ def test_media_buttons_render_accessible_svg_icons(data):
         "pl-media-player-icon pl-media-player-icon-muted",
     }
 
-    for icon in play_button.xpath("./svg") + mute_button.xpath("./svg"):
+    assert test_sound_button.text_content().strip() == ""
+    assert test_sound_button.attrib["aria-label"] == "Play test sound"
+    test_sound_tooltip = test_sound_button.getnext()
+    audio_controls = test_sound_button.getparent().getparent()
+    assert "pl-media-player-audio-buttons" in audio_controls.classes
+    assert audio_controls.attrib["aria-label"] == "Audio controls"
+    assert mute_button.getparent().getparent() is audio_controls
+    assert test_sound_tooltip.attrib["role"] == "tooltip"
+    assert test_sound_tooltip.text_content().strip() == "Check Audio"
+    assert (
+        test_sound_button.attrib["aria-describedby"] == test_sound_tooltip.attrib["id"]
+    )
+    assert {icon.attrib["class"] for icon in test_sound_button.xpath("./svg")} == {
+        "pl-media-player-icon pl-media-player-icon-test-sound"
+    }
+
+    for icon in (
+        play_button.xpath("./svg")
+        + test_sound_button.xpath("./svg")
+        + mute_button.xpath("./svg")
+    ):
         assert icon.attrib["aria-hidden"] == "true"
         assert icon.attrib["focusable"] == "false"
+
+
+def test_test_sound_button_only_renders_for_limited_playback(data):
+    write_media(data, "clip.wav")
+    unlimited = (
+        '<pl-media-player file-name="clip.wav" player-id="free"></pl-media-player>'
+    )
+    limited = (
+        '<pl-media-player file-name="clip.wav" max-plays="1" '
+        'player-id="limited"></pl-media-player>'
+    )
+
+    prepare(unlimited, data)
+    prepare(limited, data)
+    unlimited_document = media_player.lxml.html.fragment_fromstring(
+        render(unlimited, data)
+    )
+    limited_document = media_player.lxml.html.fragment_fromstring(render(limited, data))
+
+    assert not unlimited_document.xpath(
+        ".//button[contains(@class, 'pl-media-player-test-sound')]"
+    )
+    assert (
+        len(
+            limited_document.xpath(
+                ".//button[contains(@class, 'pl-media-player-test-sound')]"
+            )
+        )
+        == 1
+    )
 
 
 def test_playback_count_is_restored_from_submission_and_excluded_from_answers(data):

@@ -12,6 +12,7 @@ distribution.
 
 - Accessible audio and video controls with native HTML media playback.
 - Unlimited playback or a positive `max-plays` session budget.
+- A three-tone volume check before limited playback.
 - Pause/resume within one session without double-counting.
 - Optional pause and seeking restrictions.
 - Origin-wide volume memory with same-page player synchronization.
@@ -72,8 +73,9 @@ Two allowed sessions, with pause/resume but no seeking:
 ></pl-media-player>
 ```
 
-Players with `max-plays` prevent muting and zero volume by default. Override that behavior when
-needed:
+Players with `max-plays` prevent muting and zero volume by default. They also show a test-sound
+button that plays three tones at increasing volume without using a playback attempt. Override the
+muting behavior when needed:
 
 ```html
 <pl-media-player

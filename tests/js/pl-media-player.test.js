@@ -54,6 +54,7 @@ class FakeMedia extends FakeElement {
     this.paused = true;
     this.seeking = false;
     this.volume = 1;
+    this.readyState = 1;
     this.pauseCalls = 0;
     this.playCalls = 0;
   }
@@ -76,9 +77,94 @@ class FakeMedia extends FakeElement {
   }
 }
 
+class FakeAudioParam {
+  constructor() {
+    this.events = [];
+  }
+
+  setValueAtTime(value, time) {
+    this.events.push({ method: 'setValueAtTime', time, value });
+  }
+
+  linearRampToValueAtTime(value, time) {
+    this.events.push({ method: 'linearRampToValueAtTime', time, value });
+  }
+}
+
+class FakeAudioNode {
+  constructor() {
+    this.connectedTo = null;
+    this.disconnected = false;
+  }
+
+  connect(node) {
+    this.connectedTo = node;
+  }
+
+  disconnect() {
+    this.disconnected = true;
+  }
+}
+
+class FakeGain extends FakeAudioNode {
+  constructor() {
+    super();
+    this.gain = new FakeAudioParam();
+  }
+}
+
+class FakeOscillator extends FakeAudioNode {
+  constructor() {
+    super();
+    this.frequency = { value: 0 };
+    this.onended = null;
+    this.startTime = null;
+    this.stopTime = null;
+    this.type = '';
+  }
+
+  start(time) {
+    this.startTime = time;
+  }
+
+  stop(time) {
+    this.stopTime = time;
+  }
+
+  finish() {
+    this.onended?.();
+  }
+}
+
+class FakeAudioContext {
+  static instances = [];
+
+  constructor() {
+    this.currentTime = 5;
+    this.destination = {};
+    this.gains = [];
+    this.oscillators = [];
+    this.state = 'running';
+    FakeAudioContext.instances.push(this);
+  }
+
+  createGain() {
+    const gain = new FakeGain();
+    this.gains.push(gain);
+    return gain;
+  }
+
+  createOscillator() {
+    const oscillator = new FakeOscillator();
+    this.oscillators.push(oscillator);
+    return oscillator;
+  }
+}
+
 class FakeContainer extends FakeElement {
   constructor(config) {
     super();
+    this.config = config;
     this.media = new FakeMedia();
     this.controls = new FakeElement();
     this.controls.hidden = true;
@@ -90,6 +176,13 @@ class FakeContainer extends FakeElement {
     this.seek = new FakeElement();
     this.seekTooltip = new FakeElement();
     this.time = new FakeElement();
+    this.audioButtons = new FakeElement();
+    this.testSoundControl = new FakeElement();
+    this.testSoundButton = new FakeElement();
+    this.testSoundButton.setAttribute(
+      'class',
+      'pl-media-player-test-sound btn btn-outline-secondary btn-sm',
+    );
     this.muteLock = new FakeElement();
     this.muteButton = new FakeElement();
     this.muteButton.setAttribute('class', 'pl-media-player-mute btn btn-outline-secondary btn-sm');
@@ -117,6 +210,13 @@ class FakeContainer extends FakeElement {
     if (selector === '.pl-media-player-seek') return [this.seek];
     if (selector === '.pl-media-player-seek-tooltip') return [this.seekTooltip];
     if (selector === '.pl-media-player-time') return [this.time];
+    if (selector === '.pl-media-player-audio-buttons') return [this.audioButtons];
+    if (selector === '.pl-media-player-test-sound-control') {
+      return this.config.maxPlays === null ? [] : [this.testSoundControl];
+    }
+    if (selector === '.pl-media-player-test-sound') {
+      return this.config.maxPlays === null ? [] : [this.testSoundButton];
+    }
     if (selector === '.pl-media-player-mute-lock') return [this.muteLock];
     if (selector === '.pl-media-player-mute') return [this.muteButton];
     if (selector === '.pl-media-player-mute-tooltip') return [this.muteTooltip];
@@ -303,6 +403,7 @@ function config(overrides = {}) {
     allowOverlappingPlayback: false,
     allowPause: true,
     allowSeeking: true,
+    externalAudio: false,
     maxPlays: 2,
     playerId: 'main',
     showRemaining: true,
@@ -322,6 +423,7 @@ function loadPlayers(
   storage = new MemoryStorage(),
   history = new MemoryHistory(),
   document = new FakeDocument(),
+  globals = {},
 ) {
   const context = {
     console,
@@ -329,6 +431,7 @@ function loadPlayers(
     history,
     jQuery: createJQuery(containers),
     localStorage: storage,
+    ...globals,
   };
   vm.runInNewContext(PLAYER_SOURCE, context, { filename: 'pl-media-player.js' });
   return context;
@@ -339,9 +442,9 @@ function playbackKey(history, overrides = {}) {
   return `pl-media-player:v2:${history.state.plMediaPlayerPageInstanceId}:${playerConfig.playerId}`;
 }
 
-test('all lockout popups use Bootstrap utility styling', () => {
+test('all tooltip popups use Bootstrap utility styling', () => {
   const bootstrapClasses = /bg-dark text-white rounded px-2 py-1 small shadow-sm/g;
-  assert.equal(PLAYER_TEMPLATE_SOURCE.match(bootstrapClasses)?.length, 3);
+  assert.equal(PLAYER_TEMPLATE_SOURCE.match(bootstrapClasses)?.length, 4);
   assert.doesNotMatch(PLAYER_TEMPLATE_SOURCE, /\btooltip fade\b/);
 });
 
@@ -351,6 +454,47 @@ test('unlimited playback does not show a remaining-attempt message', () => {
 
   assert.equal(player.remaining.textContent, '');
   assert.equal(player.remaining.hidden, true);
+});
+
+test('external audio shows a spinner while loading and buffering', () => {
+  const player = container({ externalAudio: true });
+  player.media.readyState = 0;
+  loadPlayers([player]);
+
+  assert.equal(player.playButton.getAttribute('data-icon'), 'loading');
+  assert.equal(player.playButton.getAttribute('aria-busy'), 'true');
+
+  player.media.emit('loadedmetadata');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'play');
+  assert.equal(player.playButton.getAttribute('aria-busy'), 'false');
+
+  player.playButton.emit('click');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'loading');
+  assert.equal(player.playButton.getAttribute('aria-busy'), 'true');
+
+  player.media.emit('playing');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'pause');
+  assert.equal(player.playButton.getAttribute('aria-busy'), 'false');
+
+  player.media.emit('waiting');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'loading');
+
+  player.media.emit('canplay');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'pause');
+
+  player.media.emit('waiting');
+  player.media.emit('error');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'pause');
+  assert.equal(player.playButton.getAttribute('aria-busy'), 'false');
+});
+
+test('local media keeps its normal icon during loading events', () => {
+  const player = container();
+  loadPlayers([player]);
+
+  player.media.emit('loadstart');
+  assert.equal(player.playButton.getAttribute('data-icon'), 'play');
+  assert.equal(player.playButton.getAttribute('aria-busy'), 'false');
 });
 
 test('initial playback consumes one attempt and pause/resume does not consume another', () => {
@@ -548,6 +692,59 @@ test('the warning appears when a later playback becomes the final unpausable att
   assert.equal(player.playbackWarning.hidden, false);
   assert.equal(player.playbackWarning.textContent, 'Final play; pausing disabled.');
   assert.equal(player.status.textContent, '');
+});
+
+test('the limited-playback test sound has three increasing levels and uses no attempt', () => {
+  FakeAudioContext.instances = [];
+  const player = container({ maxPlays: 2 });
+  player.media.volume = 0.5;
+  loadPlayers([player], new MemoryStorage(), new MemoryHistory(), new FakeDocument(), {
+    AudioContext: FakeAudioContext,
+  });
+
+  player.testSoundButton.emit('click');
+
+  const audioContext = FakeAudioContext.instances[0];
+  const oscillator = audioContext.oscillators[0];
+  const gain = audioContext.gains[0];
+  const tonePeaks = gain.gain.events
+    .filter((event) => event.method === 'linearRampToValueAtTime' && event.value > 0)
+    .map((event) => event.value);
+  assert.deepEqual(tonePeaks, [0.04, 0.08, 0.16]);
+  assert.equal(oscillator.frequency.value, 440);
+  assert.equal(oscillator.type, 'sine');
+  assert.ok(Math.abs(oscillator.stopTime - oscillator.startTime - 0.76) < 1e-12);
+  assert.equal(player.testSoundButton.disabled, true);
+  assert.equal(player.playbackCount.value, '0');
+  assert.equal(player.media.playCalls, 0);
+
+  player.testSoundButton.emit('click');
+  assert.equal(audioContext.oscillators.length, 1);
+
+  oscillator.finish();
+  assert.equal(player.testSoundButton.disabled, false);
+  assert.equal(oscillator.disconnected, true);
+  assert.equal(gain.disconnected, true);
+});
+
+test('a missing Web Audio API hides the test sound and logs an error', () => {
+  const player = container({ maxPlays: 1 });
+  const errors = [];
+  loadPlayers(
+    [player],
+    new MemoryStorage(),
+    new MemoryHistory(),
+    new FakeDocument(),
+    { console: { error: (...args) => errors.push(args) } },
+  );
+
+  player.testSoundButton.emit('click');
+
+  assert.equal(player.status.textContent, '');
+  assert.equal(player.testSoundControl.hidden, true);
+  assert.equal(player.audioButtons.getAttribute('data-test-sound-unavailable'), 'true');
+  assert.match(errors[0][0], /test sound is not supported/);
+  assert.equal(player.playbackCount.value, '0');
 });
 
 test('enabled custom controls play, pause, seek, mute, and adjust volume', () => {

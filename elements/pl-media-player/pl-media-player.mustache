@@ -83,6 +83,14 @@
             <rect x="4" y="3" width="3" height="10" rx="0.5"></rect>
             <rect x="9" y="3" width="3" height="10" rx="0.5"></rect>
           </svg>
+          <svg
+            class="pl-media-player-icon pl-media-player-icon-loading"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <circle cx="8" cy="8" r="5.5"></circle>
+          </svg>
         </button>
         <span
           class="pl-media-player-tooltip pl-media-player-play-tooltip bg-dark text-white rounded px-2 py-1 small shadow-sm"
@@ -111,43 +119,72 @@
         ></span>
       </span>
       <span class="pl-media-player-time" aria-live="off">0:00 / 0:00</span>
-      <span
-        class="pl-media-player-control-lock pl-media-player-mute-lock"
-        role="group"
-        tabindex="-1"
-      >
-        <button
-          class="pl-media-player-mute btn btn-outline-secondary btn-sm"
-          type="button"
-          aria-label="Mute"
-          data-icon="volume"
-        >
-          <svg
-            class="pl-media-player-icon pl-media-player-icon-volume"
-            viewBox="0 0 16 16"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path d="M2.5 6h2L8 3v10l-3.5-3h-2Z"></path>
-            <path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"></path>
-            <path d="M12.5 3.5a6 6 0 0 1 0 9"></path>
-          </svg>
-          <svg
-            class="pl-media-player-icon pl-media-player-icon-muted"
-            viewBox="0 0 16 16"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path d="M2.5 6h2L8 3v10l-3.5-3h-2Z"></path>
-            <path d="m10.5 6 3.5 4"></path>
-            <path d="m14 6-3.5 4"></path>
-          </svg>
-        </button>
+      <span class="pl-media-player-audio-buttons" role="group" aria-label="Audio controls">
+        {{#limited_playback}}
+          <span class="pl-media-player-test-sound-control">
+            <button
+              class="pl-media-player-test-sound btn btn-outline-secondary btn-sm"
+              type="button"
+              aria-label="Play test sound"
+              aria-describedby="pl-media-player-test-sound-tooltip-{{dom_id}}"
+            >
+              <svg
+                class="pl-media-player-icon pl-media-player-icon-test-sound"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M4 5.7a4.3 4.3 0 1 1 8.6 0c0 4-4 4-4 6.6a2.3 2.3 0 0 1-4.6 0"></path>
+                <path d="M10.3 5.7a2 2 0 1 0-4 0v.7a1.3 1.3 0 0 0 1.3 1.3H8"></path>
+              </svg>
+            </button>
+            <span
+              class="pl-media-player-tooltip pl-media-player-test-sound-tooltip bg-dark text-white rounded px-2 py-1 small shadow-sm"
+              id="pl-media-player-test-sound-tooltip-{{dom_id}}"
+              role="tooltip"
+            >
+              Check Audio
+            </span>
+          </span>
+        {{/limited_playback}}
         <span
-          class="pl-media-player-tooltip pl-media-player-mute-tooltip bg-dark text-white rounded px-2 py-1 small shadow-sm"
-          id="pl-media-player-mute-tooltip-{{dom_id}}"
-          role="tooltip"
-        ></span>
+          class="pl-media-player-control-lock pl-media-player-mute-lock"
+          role="group"
+          tabindex="-1"
+        >
+          <button
+            class="pl-media-player-mute btn btn-outline-secondary btn-sm"
+            type="button"
+            aria-label="Mute"
+            data-icon="volume"
+          >
+            <svg
+              class="pl-media-player-icon pl-media-player-icon-volume"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M2.5 6h2L8 3v10l-3.5-3h-2Z"></path>
+              <path d="M10.5 5.5a3.5 3.5 0 0 1 0 5"></path>
+              <path d="M12.5 3.5a6 6 0 0 1 0 9"></path>
+            </svg>
+            <svg
+              class="pl-media-player-icon pl-media-player-icon-muted"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M2.5 6h2L8 3v10l-3.5-3h-2Z"></path>
+              <path d="m10.5 6 3.5 4"></path>
+              <path d="m14 6-3.5 4"></path>
+            </svg>
+          </button>
+          <span
+            class="pl-media-player-tooltip pl-media-player-mute-tooltip bg-dark text-white rounded px-2 py-1 small shadow-sm"
+            id="pl-media-player-mute-tooltip-{{dom_id}}"
+            role="tooltip"
+          ></span>
+        </span>
       </span>
       <input
         class="pl-media-player-volume"
@@ -161,6 +198,9 @@
     </div>
     <p class="pl-media-player-message small text-nowrap mb-0" aria-live="polite">
       <span class="pl-media-player-playback-warning text-danger" hidden></span>
+      {{#grading_play_count}}
+        <span class="pl-media-player-grading-play-count text-muted">{{grading_play_count}}</span>
+      {{/grading_play_count}}
       {{#show_remaining}}
         <span class="pl-media-player-remaining text-muted"></span>
       {{/show_remaining}}
