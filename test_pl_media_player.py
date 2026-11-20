@@ -289,18 +289,24 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
             "Provide file-name",
         ),
         (
-            '<pl-media-player file-name="clip.wav" randomize="true" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player file-name="clip.wav" randomize="true" '
+                'player-id="main"></pl-media-player>'
+            ),
             "cannot be combined",
         ),
         (
-            '<pl-media-player source-directory="clips" randomize="false" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player source-directory="clips" randomize="false" '
+                'player-id="main"></pl-media-player>'
+            ),
             "Provide file-name",
         ),
         (
-            '<pl-media-player file-name="clip.wav" max-plays="0" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player file-name="clip.wav" max-plays="0" '
+                'player-id="main"></pl-media-player>'
+            ),
             "at least 1",
         ),
         (
@@ -308,49 +314,69 @@ def test_directory_discovery_rejects_symlink_escape(data, tmp_path):
             "player-id",
         ),
         (
-            '<pl-media-player file-name="clip.wav" allow-muting="sometimes" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player file-name="clip.wav" allow-muting="sometimes" '
+                'player-id="main"></pl-media-player>'
+            ),
             "allow-muting",
         ),
         (
-            '<pl-media-player file-name="clip.wav" '
-            'allow-overlapping-playback="sometimes" player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player file-name="clip.wav" '
+                'allow-overlapping-playback="sometimes" '
+                'player-id="main"></pl-media-player>'
+            ),
             "allow-overlapping-playback",
         ),
         (
-            '<pl-media-player source-directory="clips" randomize="true" '
-            'media-type="audio" extensions="mp4" player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player source-directory="clips" randomize="true" '
+                'media-type="audio" extensions="mp4" '
+                'player-id="main"></pl-media-player>'
+            ),
             "Unsupported extensions",
         ),
         (
-            '<pl-media-player url="ftp://media.example.test/clip.mp3" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player url="ftp://media.example.test/clip.mp3" '
+                'player-id="main"></pl-media-player>'
+            ),
             "absolute HTTP",
         ),
         (
-            '<pl-media-player url="https://media.example.test/playback" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player url="https://media.example.test/playback" '
+                'player-id="main"></pl-media-player>'
+            ),
             "Cannot infer the media type",
         ),
         (
-            '<pl-media-player url="https://media.example.test/clip.mp4" '
-            'media-type="audio" player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player url="https://media.example.test/clip.mp4" '
+                'media-type="audio" player-id="main"></pl-media-player>'
+            ),
             "not audio media",
         ),
         (
-            '<pl-media-player file-name="clip.wav" '
-            'url="https://media.example.test/clip.wav" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player file-name="clip.wav" '
+                'url="https://media.example.test/clip.wav" '
+                'player-id="main"></pl-media-player>'
+            ),
             "cannot be combined",
         ),
         (
-            '<pl-media-player url="https://www.youtube.com/watch?v=VIDEO_ID" '
-            'max-plays="2" player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player url="https://www.youtube.com/watch?v=VIDEO_ID" '
+                'max-plays="2" player-id="main"></pl-media-player>'
+            ),
             "YouTube url cannot be combined",
         ),
         (
-            '<pl-media-player url="https://www.youtube.com/watch" '
-            'player-id="main"></pl-media-player>',
+            (
+                '<pl-media-player url="https://www.youtube.com/watch" '
+                'player-id="main"></pl-media-player>'
+            ),
             "YouTube url must identify a video",
         ),
     ],
